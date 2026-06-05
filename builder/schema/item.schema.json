@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cdda-item",
+  "title": "CDDA Item",
+  "type": "object",
+  "oneOf": [
+    { "required": ["type", "id"] },
+    { "required": ["type", "abstract"] }
+  ],
+  "properties": {
+    "type": { "type": "string" },
+    "id": { "type": "string" },
+    "abstract": { "type": "string" }
+  }
+}

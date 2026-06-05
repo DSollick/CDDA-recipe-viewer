@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cdda-construction",
+  "title": "CDDA Construction",
+  "type": "object",
+  "required": ["type", "id"],
+  "properties": {
+    "type": { "const": "construction" },
+    "id": { "type": "string" }
+  }
+}

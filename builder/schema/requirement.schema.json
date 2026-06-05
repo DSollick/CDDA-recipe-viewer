@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cdda-requirement",
+  "title": "CDDA Requirement",
+  "type": "object",
+  "required": ["type", "id"],
+  "properties": {
+    "type": { "const": "requirement" },
+    "id": { "type": "string" }
+  }
+}
