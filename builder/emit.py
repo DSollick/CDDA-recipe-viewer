@@ -48,6 +48,14 @@ def _builder_version() -> str:
         return "dev"
 
 
+def _build_era_buckets(graph: "Graph") -> dict[str, list[str]]:
+    buckets: dict[str, list[str]] = {}
+    for nid, node in graph.nodes.items():
+        if node.era is not None:
+            buckets.setdefault(node.era, []).append(nid)
+    return buckets
+
+
 def _dataset(graph: "Graph") -> dict:
     """Serialize a single Graph into the dataset sub-object."""
     nodes = {nid: node.to_dict() for nid, node in graph.nodes.items()}
@@ -65,7 +73,9 @@ def _dataset(graph: "Graph") -> dict:
     return {
         "nodes": nodes,
         "edges": edges,
-        "eras": {},         # TODO: populated by eras.py
+        # Derive era buckets from node.era written by eras.annotate().
+        # If annotate() was never called all eras are None and this is {}.
+        "eras": _build_era_buckets(graph),
         "bottlenecks": bottlenecks,
     }
 

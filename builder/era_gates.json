@@ -1,0 +1,18 @@
+{
+  "_comment": "Era gate items — the presence of any gate item in a node's transitive dependency set determines its era. Era = latest gate encountered. Edit freely; unknown IDs are silently ignored.",
+  "wood":       ["log", "2x4", "stick", "tinder", "cordage"],
+  "stone":      ["rock", "flint", "charcoal", "clay_lump"],
+  "bone":       ["bone", "sinew"],
+  "leather":    ["leather", "tallow", "wax_any"],
+  "copper":     ["copper_scrap_equivalent", "copper_rod", "copper_wire"],
+  "bronze":     ["bronze_tiny"],
+  "iron":       ["lc_steel_chunk", "iron_ore", "metalworking_tongs_any",
+                 "metal_file_any", "flux_fe_forge", "hotcut_any",
+                 "swage", "draw_plate"],
+  "glass":      ["glassblowers_crucible", "glass_sheet"],
+  "chemical":   ["chemistry_set_basic", "glue_strong"],
+  "plastics":   ["plastic_chunk", "duct_tape"],
+  "combustion": ["gasoline", "diesel"],
+  "electrical": ["hotplate", "cable", "battery"],
+  "energy":     ["plut_cell", "atomic_battery", "storage_battery_100"]
+}
