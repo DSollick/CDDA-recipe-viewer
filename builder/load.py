@@ -198,7 +198,16 @@ def _entity_id(obj: dict, type_category: str) -> str | None:
 
 
 def _recipe_key(obj: dict, existing: dict) -> str:
-    base = obj.get("result", "unknown")
+    # CDDA composite recipe ID: result + "_" + id_suffix (if present).
+    # Recipes copy-from each other using this composite key, so we must
+    # store them under it — e.g. result="threshed_wheat" + id_suffix="flail"
+    # → key "threshed_wheat_flail", which is what copy-from references.
+    result = obj.get("result")
+    id_suffix = obj.get("id_suffix")
+    if result:
+        base = f"{result}_{id_suffix}" if id_suffix else result
+    else:
+        base = obj.get("abstract") or "unknown"
     if base not in existing:
         return base
     n = 2

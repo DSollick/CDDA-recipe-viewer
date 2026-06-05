@@ -339,4 +339,10 @@ def _id_key(obj: dict) -> str | None:
     return obj.get("id")
 
 def _recipe_result_key(obj: dict) -> str | None:
-    return obj.get("result") or obj.get("abstract")
+    # Must match _recipe_key in load.py: result + "_" + id_suffix (if present),
+    # or abstract for prototype recipes.
+    result = obj.get("result")
+    id_suffix = obj.get("id_suffix")
+    if result:
+        return f"{result}_{id_suffix}" if id_suffix else result
+    return obj.get("abstract")
