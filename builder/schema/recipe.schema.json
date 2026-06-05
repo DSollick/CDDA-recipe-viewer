@@ -7,9 +7,16 @@
   "properties": {
     "type": { "const": "recipe" },
     "result": { "type": "string" },
-    "copy-from": { "type": "string" },
-    "variant": { "type": "string" }
+    "abstract": { "type": "string" },
+    "copy-from": { "type": "string" }
   },
-  "if": { "not": { "required": ["copy-from"] } },
+  "if": {
+    "not": {
+      "anyOf": [
+        { "required": ["abstract"] },
+        { "required": ["copy-from"] }
+      ]
+    }
+  },
   "then": { "required": ["result"] }
 }

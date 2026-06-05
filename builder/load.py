@@ -102,10 +102,17 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
             continue
         innawood_file_count += 1
         for obj in objects:
-            _dispatch(obj, buckets, blacklists)
+            # Innawood objects go into innawood_additions only.
+            # resolve.py applies them as a second pass on top of resolved vanilla
+            # so that same-id copy-from patterns (Innawood patching a vanilla entity
+            # with the same id) don't create self-referential cycles.
             obj_type = obj.get("type")
             if obj_type:
                 innawood_additions.setdefault(obj_type, []).append(obj)
+            # Blacklists are the only thing we dispatch directly — they don't use
+            # copy-from and are needed regardless of resolution order.
+            if obj_type in BLACKLIST_TYPES:
+                blacklists.append(obj)
 
     schemas = _load_schemas()
     _validate_sample(list(buckets["recipes"].values()), schemas.get("recipe"), "recipe")
@@ -140,8 +147,8 @@ def _dispatch(obj: dict, buckets: dict[str, dict], blacklists: list[dict]) -> No
     if bucket_name == "blacklists":
         blacklists.append(obj)
         return
-    if bucket_name == "recipes":
-        key = _recipe_key(obj, buckets["recipes"])
+    if bucket_name in ("recipes", "uncrafts"):
+        key = _recipe_key(obj, buckets[bucket_name])
     else:
         key = _entity_id(obj, bucket_name)
         if key is None:
