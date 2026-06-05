@@ -3,9 +3,13 @@
   "$id": "cdda-recipe",
   "title": "CDDA Recipe",
   "type": "object",
-  "required": ["type", "result"],
+  "required": ["type"],
   "properties": {
     "type": { "const": "recipe" },
-    "result": { "type": "string" }
-  }
+    "result": { "type": "string" },
+    "copy-from": { "type": "string" },
+    "variant": { "type": "string" }
+  },
+  "if": { "not": { "required": ["copy-from"] } },
+  "then": { "required": ["result"] }
 }

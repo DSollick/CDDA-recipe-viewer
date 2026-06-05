@@ -30,6 +30,7 @@ def test_fetch_and_load_experimental():
         print(f"Commit date:      {clone.commit_date}")
         print(f"Items:            {len(data.items)}")
         print(f"Recipes:          {len(data.recipes)}")
+        print(f"Uncrafts:         {len(data.uncrafts)}")
         print(f"Constructions:    {len(data.constructions)}")
         print(f"Practice:         {len(data.practice)}")
         print(f"Requirements:     {len(data.requirements)}")

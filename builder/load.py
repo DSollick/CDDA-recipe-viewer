@@ -29,6 +29,7 @@ BLACKLIST_TYPES: frozenset[str] = frozenset({
 _TYPE_TO_BUCKET: dict[str, str] = {
     **{t: "items" for t in ITEM_TYPES},
     "recipe": "recipes",
+    "uncraft": "uncrafts",
     "construction": "constructions",
     "practice": "practice",
     "requirement": "requirements",
@@ -46,6 +47,7 @@ class SchemaValidationError(Exception):
 class LoadedData:
     items: dict[str, dict]
     recipes: dict[str, dict]
+    uncrafts: dict[str, dict]
     constructions: dict[str, dict]
     practice: dict[str, dict]
     requirements: dict[str, dict]
@@ -71,6 +73,7 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
     buckets: dict[str, dict] = {
         "items": {},
         "recipes": {},
+        "uncrafts": {},
         "constructions": {},
         "practice": {},
         "requirements": {},
@@ -113,6 +116,7 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
     return LoadedData(
         items=buckets["items"],
         recipes=buckets["recipes"],
+        uncrafts=buckets["uncrafts"],
         constructions=buckets["constructions"],
         practice=buckets["practice"],
         requirements=buckets["requirements"],
