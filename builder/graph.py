@@ -92,10 +92,13 @@ class Edge:
     quality_level: int | None = None
     is_default: bool = True
     recipe_key: str | None = None
+    # Index of the component/tool slot this edge belongs to within its recipe.
+    # Edges sharing the same (from_node, recipe_key, slot_index) are OR-alternatives
+    # within one slot — only one needs to be provided to craft the item.
+    slot_index: int | None = None
 
     def to_dict(self) -> dict:
         d = dataclasses.asdict(self)
-        # Rename to match design doc field names
         d["from"] = d.pop("from_node")
         d["to"] = d.pop("to_node")
         return d
@@ -252,6 +255,10 @@ def _craft_edges(
     """Build all dependency edges for a crafting-style recipe."""
     edges: list[Edge] = []
 
+    # Component and tool edges share a single slot counter so slot_index is unique
+    # within a recipe — edges with the same slot_index are OR-alternatives.
+    slot_counter = 0
+
     # Component edges — three-level list: [slot[alternative[item_id, qty, ?qualifier]]]
     for slot in recipe.get("components", []):
         for alt_idx, entry in enumerate(slot):
@@ -263,7 +270,9 @@ def _craft_edges(
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
                 recipe_key=recipe_key,
+                slot_index=slot_counter,
             ))
+        slot_counter += 1
 
     # Specific tool edges — same list structure; qty=-1 means not consumed
     for slot in recipe.get("tools", []):
@@ -276,7 +285,9 @@ def _craft_edges(
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
                 recipe_key=recipe_key,
+                slot_index=slot_counter,
             ))
+        slot_counter += 1
 
     # Tool quality edges — qualities can be flat [{id,level}] or nested [[{id,level},...]]
     # where the outer list is AND-slots and the inner list is OR-alternatives.

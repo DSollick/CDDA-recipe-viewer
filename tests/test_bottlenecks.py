@@ -16,9 +16,10 @@ def _item(id_: str, **kw) -> Node:
     return Node(id=id_, type="item", display_name=id_, **kw)
 
 
-def _edge(from_: str, to: str, *, is_default=True, qty=1) -> Edge:
+def _edge(from_: str, to: str, *, is_default=True, qty=1, slot_idx=0, recipe_key=None) -> Edge:
     return Edge(from_node=from_, to_node=to, type="requires_component",
-                quantity=qty, is_default=is_default)
+                quantity=qty, is_default=is_default,
+                slot_index=slot_idx, recipe_key=recipe_key)
 
 
 def _graph(*nodes_and_edges) -> Graph:
@@ -70,16 +71,40 @@ def test_score_transitive():
     assert s["blade"] == 1    # only sword depends on blade
 
 
-def test_score_does_not_count_non_default():
-    # alt edge is_default=False — should not be followed
+def test_score_slot_with_alternatives_not_counted():
+    # axe_head and alt_head are OR-alternatives in the same slot — neither is a must-have
     g = _graph(
         _item("axe"), _item("axe_head"), _item("alt_head"),
-        _edge("axe", "axe_head", is_default=True),
-        _edge("axe", "alt_head", is_default=False),
+        _edge("axe", "axe_head", is_default=True,  slot_idx=0),
+        _edge("axe", "alt_head",  is_default=False, slot_idx=0),
+    )
+    s = score(g)
+    assert s.get("axe_head", 0) == 0
+    assert s.get("alt_head", 0) == 0
+
+
+def test_score_sole_slot_is_must_have():
+    # axe_head is the only option in its slot — is a must-have
+    g = _graph(
+        _item("axe"), _item("axe_head"),
+        _edge("axe", "axe_head", is_default=True, slot_idx=0),
     )
     s = score(g)
     assert s.get("axe_head", 0) == 1
-    assert s.get("alt_head", 0) == 0
+
+
+def test_score_multi_slot_recipe():
+    # axe needs axe_head (sole, slot 0) AND handle (sole, slot 1)
+    # Both are must-haves; handle is also needed by spear
+    g = _graph(
+        _item("axe"), _item("spear"), _item("axe_head"), _item("handle"),
+        _edge("axe",   "axe_head", slot_idx=0),
+        _edge("axe",   "handle",   slot_idx=1),
+        _edge("spear", "handle",   slot_idx=0),
+    )
+    s = score(g)
+    assert s.get("axe_head", 0) == 1
+    assert s.get("handle", 0) == 2  # both axe and spear require it
 
 
 def test_score_skips_virtual_nodes():
@@ -127,7 +152,9 @@ def test_score_chain_depth():
     # a → b → c → d; d.score should be 3 (a, b, c all depend on it transitively)
     g = _graph(
         _item("a"), _item("b"), _item("c"), _item("d"),
-        _edge("a", "b"), _edge("b", "c"), _edge("c", "d"),
+        _edge("a", "b", slot_idx=0),
+        _edge("b", "c", slot_idx=0),
+        _edge("c", "d", slot_idx=0),
     )
     s = score(g)
     assert s["d"] == 3
@@ -138,14 +165,16 @@ def test_score_chain_depth():
 def test_score_diamond():
     #   a
     #  / \
-    # b   c
+    # b   c    (a needs BOTH b and c — two separate slots)
     #  \ /
     #   d
-    # d.score = 3 (a, b, c); b.score = c.score = 1 (a)
+    # d.score = 3 (a, b, c all require it); b.score = c.score = 1 (only a requires them)
     g = _graph(
         _item("a"), _item("b"), _item("c"), _item("d"),
-        _edge("a", "b"), _edge("a", "c"),
-        _edge("b", "d"), _edge("c", "d"),
+        _edge("a", "b", slot_idx=0),
+        _edge("a", "c", slot_idx=1),
+        _edge("b", "d", slot_idx=0),
+        _edge("c", "d", slot_idx=0),
     )
     s = score(g)
     assert s["d"] == 3
@@ -168,10 +197,13 @@ def test_annotate_writes_scores_to_nodes():
 
 
 def test_annotate_returns_top_n():
+    # a needs c (slot 0) AND d (slot 1); b needs d (slot 0); c needs d (slot 0)
+    # d.score = 3 (a,b,c); c.score = 1 (a)
     g = _graph(
         _item("a"), _item("b"), _item("c"), _item("d"),
-        _edge("a", "d"), _edge("b", "d"), _edge("c", "d"),
-        _edge("a", "c"),
+        _edge("a", "c", slot_idx=0), _edge("a", "d", slot_idx=1),
+        _edge("b", "d", slot_idx=0),
+        _edge("c", "d", slot_idx=0),
     )
     top = annotate(g, top_n=2)
     assert top[0] == "d"  # highest score
@@ -179,11 +211,11 @@ def test_annotate_returns_top_n():
 
 
 def test_annotate_top_n_respects_limit():
-    # Chain: a → b → c → d → e gives d.score=4, c.score=3, b.score=2, e.score=0+...
-    # Actually: a→b→c→d→e: e.score=4, d.score=3, c.score=2, b.score=1 — 4 nodes with scores
+    # Chain a→b→c→d→e: e.score=4, d.score=3, c.score=2, b.score=1 — 4 nodes with scores
     items = [_item(x) for x in ("a", "b", "c", "d", "e")]
     edges = [
-        _edge("a", "b"), _edge("b", "c"), _edge("c", "d"), _edge("d", "e"),
+        _edge("a", "b", slot_idx=0), _edge("b", "c", slot_idx=0),
+        _edge("c", "d", slot_idx=0), _edge("d", "e", slot_idx=0),
     ]
     g = _graph(*items, *edges)
     top = annotate(g, top_n=3)

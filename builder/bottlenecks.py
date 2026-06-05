@@ -37,17 +37,44 @@ _VIRTUAL_PREFIXES = ("qual_", "skill_", "prof_")
 
 def _build_dep_graph(graph: "Graph") -> dict[str, set[str]]:
     """
-    Return forward adjacency: node_id → set of item node_ids it directly
-    depends on (requires_component, is_default=True, item targets only).
+    Return forward adjacency: node_id → set of item node_ids it *must* have
+    (no alternatives in the same component/tool slot).
+
+    Uses slot_index when available: edges sharing the same
+    (from_node, recipe_key, slot_index) are OR-alternatives — if any
+    is_default=False edge exists in a slot, the whole slot is skipped.
+    Falls back to is_default=True for edges without slot_index (test graphs).
     """
     deps: dict[str, set[str]] = collections.defaultdict(set)
+
+    # Separate edges into those with slot info and those without.
+    slot_default: dict[tuple, str] = {}   # (from, key, slot) → default item
+    slot_has_alt: set[tuple] = set()      # slots that have at least one alternative
+
     for edge in graph.edges:
-        if not (edge.type == "requires_component" and edge.is_default):
+        if edge.type != "requires_component":
             continue
         target = edge.to_node
         if any(target.startswith(p) for p in _VIRTUAL_PREFIXES):
             continue
-        deps[edge.from_node].add(target)
+
+        if edge.slot_index is None:
+            # No slot info: treat as must-have when is_default (fallback for tests)
+            if edge.is_default:
+                deps[edge.from_node].add(target)
+            continue
+
+        key = (edge.from_node, edge.recipe_key, edge.slot_index)
+        if edge.is_default:
+            slot_default[key] = target
+        else:
+            slot_has_alt.add(key)
+
+    # Include only sole-option slots (default item exists, no alternatives)
+    for key, item_id in slot_default.items():
+        if key not in slot_has_alt:
+            deps[key[0]].add(item_id)
+
     return dict(deps)
 
 
