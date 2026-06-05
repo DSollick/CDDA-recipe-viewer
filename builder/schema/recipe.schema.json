@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cdda-recipe",
+  "title": "CDDA Recipe",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "recipe" },
+    "result": { "type": "string" },
+    "abstract": { "type": "string" },
+    "copy-from": { "type": "string" }
+  },
+  "if": {
+    "not": {
+      "anyOf": [
+        { "required": ["abstract"] },
+        { "required": ["copy-from"] }
+      ]
+    }
+  },
+  "then": { "required": ["result"] }
+}

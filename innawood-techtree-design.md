@@ -82,6 +82,31 @@ data/mods/              # Top-level mod index (to understand mod loading order)
 The CDDA repo is cloned to a temp directory during the build and discarded afterward.
 The compiled output (`graph.json`) is the only artifact committed to the site repo.
 
+### Observed Data Shape (verified against CDDA master, June 2026)
+
+| Type | Vanilla count | Innawood additions |
+|---|---|---|
+| `ITEM` | ~10,450 | ~small (new primitives) |
+| `recipe` | ~6,061 | ~several dozen |
+| `construction` | ~782 | ~several |
+| `practice` | ~131 | ~a few |
+| `requirement` | ~473 | ~several |
+| `tool_quality` | ~89 | 0 |
+| `item_group` | ~5,390 | many (Innawood spawn tables) |
+| `uncraft` | ~1 (vanilla) | 4 (Innawood) |
+| `construction_group` | many | present |
+
+**Important: CDDA unified all item subtypes into a single `"ITEM"` type** (circa 0.G+).
+The old per-category types (`AMMO`, `ARMOR`, `BOOK`, `COMESTIBLE`, `CONTAINER`, `GENERIC`,
+`GUN`, `GUNMOD`, `MAGAZINE`, `MELEE`, `PET_ARMOR`, `TOOL`, `TOOL_ARMOR`, `TOOLMOD`) no longer
+appear in live data as `type` values. Subcategory information is now expressed via a `subtypes`
+array on the item object (e.g. `"subtypes": ["TOOLMOD"]`).
+
+**`copy-from` is pervasive:** 5,074 items and 1,039 recipes use `copy-from`. This inheritance
+chain must be fully resolved before any graph construction can happen. Abstract items (those
+with `abstract` instead of `id`) serve as base prototypes and should not appear as nodes in
+the final graph.
+
 ### Stable vs. Experimental
 
 The pipeline builds **two separate graph datasets**:
@@ -113,27 +138,32 @@ of applying the Innawood mod layer on top of the full vanilla CDDA data. The pip
 correctly emulate CDDA's mod loading sequence:
 
 1. Load all vanilla JSON from `data/json/`
-2. Load and apply Innawood's **blacklists** — remove blacklisted items, recipes, and item groups
+2. Load and apply Innawood's **blacklists** — remove blacklisted monsters and scenarios
 3. Load and apply Innawood's **additions** — new items, recipes, scenarios
 4. Load and apply Innawood's **overrides/copy-from** — modifications to vanilla entities
 5. Result: the "Innawood world" dataset
 
-**CDDA blacklist types to handle:**
-- `ITEM_BLACKLIST` — removes an item type entirely
-- `RECIPE_BLACKLIST` — removes a specific recipe
-- `ITEM_GROUP_BLACKLIST` — removes an item group (affects spawn resolution)
-- `SKILL_BLACKLIST` — if present
-- `copy-from` with field deletions
+**Observed blacklist types in Innawood (verified against live data):**
+- `MONSTER_BLACKLIST` — removes monster categories (e.g. `"MAN_MADE"`) — present
+- `SCENARIO_BLACKLIST` with `subtype: whitelist` — restricts available start scenarios — present
+- `ITEM_BLACKLIST`, `RECIPE_BLACKLIST`, `ITEM_GROUP_BLACKLIST`, `SKILL_BLACKLIST` — **NOT present** in Innawood; the mod is additive rather than subtractive at the item/recipe level
 
-If the blacklist resolution produces an inconsistent state (e.g. a surviving recipe references
-a blacklisted item), the build should **log a warning** and mark that recipe as `incomplete: true`
+This means for Innawood specifically, mod resolution is primarily about:
+1. Resolving the full vanilla `copy-from` inheritance chain (5,074 items and 1,039 recipes use `copy-from` in vanilla alone)
+2. Merging the 6 Innawood `copy-from` overrides on top of resolved vanilla entities
+3. Adding Innawood-only items, recipes, constructions, and professions as new entities
+
+`copy-from` with field deletions is still possible in overrides and should be handled.
+
+If the resolution produces an inconsistent state (e.g. a surviving recipe references
+an entity that couldn't be resolved), the build should **log a warning** and mark that recipe as `incomplete: true`
 rather than silently emitting bad data.
 
 ### Recipe Types Included
 
-- **Crafting recipes** — standard `type: recipe`
-- **Construction recipes** — `type: construction` (shelter, fire ring, pit, etc.)
-- **Disassembly recipes** — reverse-crafting paths, marked distinctly
+- **Crafting recipes** — `type: recipe`; note that `variant` recipes (cosmetic reskins) use `copy-from` and have no `result` field — they should be resolved via inheritance and then treated as the base recipe's result
+- **Construction recipes** — `type: construction` with a sibling `type: construction_group` for grouping (both types present in the data); construction objects use `id` as primary key
+- **Disassembly recipes** — `type: uncraft` (not a sub-field of recipe — it is its own top-level type); Innawood adds 4 uncraft entries on top of vanilla
 - **Practice recipes** — `type: practice`, shown as skill-building leaf nodes
 
 ### Leaf Node Types
@@ -421,8 +451,10 @@ adding `[innawood, mystical_innawood]` later without major refactoring.
 1. **Era classification accuracy** — will likely need a manual curation pass after v1 generates
    `era_audit.json`. Build a lightweight YAML override file that the pipeline respects.
 
-2. **Construction recipe format** — CDDA's construction JSON has a different schema than
-   crafting recipes. Confirm the field mapping before `graph.py` implementation.
+2. **Construction recipe format** — ~~Confirm the field mapping before `graph.py` implementation~~.
+   Confirmed: construction objects use `id` as primary key and a separate `type: construction_group`
+   groups related constructions. The `construction_group` type should be loaded and used for
+   display grouping but is not a graph node itself.
 
 3. **Foraging / terrain interaction items** — clay from digging, flint from rocky terrain, etc.
    These aren't in item groups at all. May need a hardcoded list for v1 with a note to revisit.
@@ -433,3 +465,17 @@ adding `[innawood, mystical_innawood]` later without major refactoring.
 5. **Proficiency acquisition paths** — proficiencies are gained through practice and books.
    For v1, proficiency nodes are leaves with a static tooltip. A future version could link
    proficiency → books that teach it → whether those books spawn in Innawood.
+
+6. **`copy-from` cycle detection** — the resolution algorithm in `resolve.py` must detect
+   and break cycles (or confirm CDDA's data is acyclic). A topological sort of the inheritance
+   graph before resolution is the safe approach.
+
+7. **Recipe `variant` objects** — recipes with `copy-from` and a `variant` field but no `result`
+   are cosmetic reskins (e.g. the shark hoodie variants). They should inherit the base recipe's
+   `result` after `copy-from` resolution. Decide whether to emit these as separate graph nodes
+   or fold them into the base recipe. Recommendation: fold — they add no crafting information.
+
+8. **`uncraft` as graph node type** — the `uncraft` type is already included in Innawood's data
+   (4 entries). It should be loaded alongside `recipe` and treated as a directed disassembly edge
+   in the graph. `load.py` currently skips it (not in any bucket). Add `uncraft` to `load.py`
+   before `graph.py` work begins.

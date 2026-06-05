@@ -164,8 +164,12 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# mkdocs documentation (not used — our site/ is the React frontend)
+# /site
+
+# Frontend build artifacts
+site/node_modules/
+site/dist/
 
 # mypy
 .mypy_cache/
