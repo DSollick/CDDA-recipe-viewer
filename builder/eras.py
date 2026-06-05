@@ -100,6 +100,10 @@ def _classify(
             r = _ERA_RANK[era]
             if r > best_rank:
                 best_rank = r
+            # Gate items are opaque: don't traverse into their deps.
+            # An item that depends on hotplate (iron gate) is iron era regardless
+            # of what hotplate itself is made from internally.
+            continue
         for child in deps.get(node, ()):
             if child not in visited:
                 stack.append(child)
@@ -127,7 +131,13 @@ def annotate(
     classified = 0
 
     for node_id, node in graph.nodes.items():
-        era = _classify(node_id, deps, item_to_era)
+        if node_id in item_to_era:
+            # Gate items: pinned to their specified era regardless of their own deps.
+            # This prevents e.g. cable (copper gate) being bumped to plastics because
+            # it depends on duct_tape.
+            era = item_to_era[node_id]
+        else:
+            era = _classify(node_id, deps, item_to_era)
         node.era = era
         if era is not None:
             era_buckets[era].append(node_id)

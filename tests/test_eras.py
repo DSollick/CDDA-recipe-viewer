@@ -82,6 +82,34 @@ def test_highest_era_gate_wins():
     assert g.nodes["axe"].era == "iron"
 
 
+def test_gate_item_is_opaque_in_bfs():
+    # item → iron_ingot (iron gate) → rock (stone gate)
+    # item should be iron, not bumped further by rock inside iron_ingot's deps.
+    gates = {"stone": ["rock"], "iron": ["iron_ingot"]}
+    g = _graph(
+        _item("item"), _item("iron_ingot"), _item("rock"),
+        _edge("item",      "iron_ingot"),
+        _edge("iron_ingot", "rock"),
+    )
+    annotate(g, gates)
+    assert g.nodes["item"].era == "iron"
+    # iron_ingot is pinned to iron even though it contains a stone dep
+    assert g.nodes["iron_ingot"].era == "iron"
+
+
+def test_gate_item_pinned_not_reclassified_by_own_deps():
+    # cable is a copper gate but depends on duct_tape (plastics gate).
+    # cable should remain copper, not be bumped to plastics.
+    gates = {"copper": ["cable"], "plastics": ["duct_tape"]}
+    g = _graph(
+        _item("cable"), _item("duct_tape"),
+        _edge("cable", "duct_tape"),
+    )
+    annotate(g, gates)
+    assert g.nodes["cable"].era == "copper"
+    assert g.nodes["duct_tape"].era == "plastics"
+
+
 def test_non_default_edge_not_followed():
     # sword → iron_ingot (non-default) → iron NOT followed; sword → rock (default)
     g = _graph(
