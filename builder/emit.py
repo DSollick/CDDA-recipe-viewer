@@ -52,11 +52,21 @@ def _dataset(graph: "Graph") -> dict:
     """Serialize a single Graph into the dataset sub-object."""
     nodes = {nid: node.to_dict() for nid, node in graph.nodes.items()}
     edges = [e.to_dict() for e in graph.edges]
+
+    # Derive top-20 bottleneck list from node scores written by bottlenecks.annotate().
+    # If annotate() was never called all scores are 0 and the list stays empty.
+    ranked = sorted(
+        [(nid, n.bottleneck_score) for nid, n in graph.nodes.items() if n.bottleneck_score > 0],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+    bottlenecks = [nid for nid, _ in ranked[:20]]
+
     return {
         "nodes": nodes,
         "edges": edges,
         "eras": {},         # TODO: populated by eras.py
-        "bottlenecks": [],  # TODO: populated by bottlenecks.py
+        "bottlenecks": bottlenecks,
     }
 
 
