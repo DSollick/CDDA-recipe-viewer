@@ -47,6 +47,7 @@ export default function NodeDetail({ node }: NodeDetailProps) {
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
+        {node.pseudo && <Badge className="bg-violet-900 text-violet-300">pseudo</Badge>}
         {node.incomplete && <Badge className="bg-red-900 text-red-300">incomplete</Badge>}
       </div>
 
