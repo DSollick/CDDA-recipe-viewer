@@ -183,8 +183,7 @@ function buildLayoutedGraph(
     data: { isTreeEdge },
   }));
 
-  // Dagre layout — tree edges only, meta nodes excluded from layout edges
-  // (their x will be overridden after layout anyway)
+  // Dagre layout — include all tree edges so meta nodes get meaningful Y positions
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
@@ -194,23 +193,22 @@ function buildLayoutedGraph(
     g.setNode(n.id, { width: nodeW(type), height: nodeH(type) });
   }
   for (const e of rfEdges) {
-    if (e.data?.isTreeEdge && !isMeta(getNode(e.target).type)) {
-      g.setEdge(e.source, e.target);
-    }
+    if (e.data?.isTreeEdge) g.setEdge(e.source, e.target);
   }
 
   dagre.layout(g);
 
-  // Find rightmost edge of any non-meta node for pinning meta nodes
-  let maxItemRight = 0;
-  for (const n of rfNodes) {
-    const type = (n.data.graphNode as GraphNode).type;
-    if (!isMeta(type)) {
-      const pos = g.node(n.id);
-      if (pos) maxItemRight = Math.max(maxItemRight, pos.x + nodeW(type) / 2);
-    }
+  // For each meta node, find the rightmost right-edge among its direct parents.
+  // This places Chemistry 1 one column past the deepest item that needs it,
+  // rather than pinning everything to the global far right.
+  const metaParentRight = new Map<string, number>();
+  for (const { source, target } of collected) {
+    if (!isMeta(getNode(target).type)) continue;
+    const parentPos = g.node(source);
+    if (!parentPos) continue;
+    const parentRight = parentPos.x + nodeW(getNode(source).type) / 2;
+    metaParentRight.set(target, Math.max(metaParentRight.get(target) ?? 0, parentRight));
   }
-  const metaX = maxItemRight + META_RIGHT_GAP;
 
   const laidOut: RFNode[] = rfNodes.map((n) => {
     const type = (n.data.graphNode as GraphNode).type;
@@ -218,8 +216,8 @@ function buildLayoutedGraph(
     if (!pos) return { ...n, position: { x: 0, y: 0 } };
 
     if (isMeta(type)) {
-      // Pin to rightmost column; keep dagre's y for vertical spacing
-      return { ...n, position: { x: metaX, y: pos.y - nodeH(type) / 2 } };
+      const x = (metaParentRight.get(n.id) ?? 0) + META_RIGHT_GAP;
+      return { ...n, position: { x, y: pos.y - nodeH(type) / 2 } };
     }
     return { ...n, position: { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 } };
   });
