@@ -1,6 +1,8 @@
 name: Nightly build & deploy
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '0 4 * * *'   # 04:00 UTC daily
   workflow_dispatch:        # allow manual trigger from the Actions tab

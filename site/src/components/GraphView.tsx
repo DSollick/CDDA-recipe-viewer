@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -19,7 +19,8 @@ import { Dataset, GraphIndex, GraphNode } from '../types';
 // ── Sizing ────────────────────────────────────────────────────────────────────
 
 const ITEM_W = 164, ITEM_H = 42;
-const META_W = 148, META_H = 34;
+const META_W = 152, META_H = 34;
+const META_RIGHT_GAP = 64; // gap between rightmost item column and meta column
 
 function isMeta(type: string) {
   return type === 'skill' || type === 'proficiency' || type === 'quality';
@@ -40,10 +41,10 @@ const DOT_COLOR: Record<string, string> = {
 };
 
 const EDGE_STROKE: Record<string, string> = {
-  requires_component:   '#64748b', // slate-500
-  requires_tool_quality:'#a855f7', // purple-500
-  requires_skill:       '#f97316', // orange-500
-  requires_proficiency: '#fb923c', // orange-400
+  requires_component:    '#64748b',
+  requires_tool_quality: '#a855f7',
+  requires_skill:        '#f97316',
+  requires_proficiency:  '#fb923c',
 };
 
 // ── Custom node ───────────────────────────────────────────────────────────────
@@ -92,9 +93,45 @@ function buildLayoutedGraph(
 ): { rfNodes: RFNode[]; rfEdges: RFEdge[] } {
   const { nodes } = dataset;
 
-  // BFS — collect nodes and edges
+  // Synthetic level-specific skill nodes: "skill_chemistry_lvl_3"
+  // Created on the fly so the data model is untouched.
+  const syntheticNodes = new Map<string, GraphNode>(); // leveledId → synthetic GraphNode
+
+  function skillLevelId(baseId: string, level: number): string {
+    return level > 0 ? `${baseId}_lvl_${level}` : baseId;
+  }
+
+  function ensureSkillLevelNode(baseId: string, level: number): string {
+    const id = skillLevelId(baseId, level);
+    if (!syntheticNodes.has(id) && !nodes[id]) {
+      const base = nodes[baseId];
+      const baseName = base?.display_name ?? baseId.replace('skill_', '');
+      syntheticNodes.set(id, {
+        ...(base ?? {
+          id, type: 'skill' as const, era: null, learn_method: null,
+          book_sources: [], skill_requirements: [], proficiency_requirements: [],
+          craft_time: null, bottleneck_score: 0, spawn_class: null,
+          incomplete: false, pseudo: false,
+        }),
+        id,
+        display_name: level > 0 ? `${baseName} ${level}` : baseName,
+      });
+    }
+    return id;
+  }
+
+  function getNode(id: string): GraphNode {
+    return nodes[id] ?? syntheticNodes.get(id) ?? {
+      id, type: 'item', display_name: id, era: null, learn_method: null,
+      book_sources: [], skill_requirements: [], proficiency_requirements: [],
+      craft_time: null, bottleneck_score: 0, spawn_class: null,
+      incomplete: true, pseudo: false,
+    };
+  }
+
+  // BFS
   const seen = new Set<string>([rootId]);
-  type Coll = { edge: typeof dataset.edges[0]; isTreeEdge: boolean };
+  type Coll = { source: string; target: string; edge: typeof dataset.edges[0]; isTreeEdge: boolean };
   const collected: Coll[] = [];
   const queue: Array<{ id: string; depth: number }> = [{ id: rootId, depth: 0 }];
 
@@ -107,26 +144,26 @@ function buildLayoutedGraph(
       if (!edge.is_default) continue;
       if (!showMeta && edge.type !== 'requires_component') continue;
 
-      const isTreeEdge = !seen.has(edge.to);
-      collected.push({ edge, isTreeEdge });
+      // For skill edges, create a level-specific target node ID
+      const target =
+        edge.type === 'requires_skill'
+          ? ensureSkillLevelNode(edge.to, edge.quality_level ?? 0)
+          : edge.to;
+
+      const isTreeEdge = !seen.has(target);
+      collected.push({ source: item.id, target, edge, isTreeEdge });
+
       if (isTreeEdge) {
-        seen.add(edge.to);
-        queue.push({ id: edge.to, depth: item.depth + 1 });
+        seen.add(target);
+        // Don't enqueue meta nodes — they're leaves by definition
+        if (!isMeta(getNode(target).type)) {
+          queue.push({ id: target, depth: item.depth + 1 });
+        }
       }
     }
   }
 
-  // Stub node for any id not found in dataset (incomplete reference)
-  function getNode(id: string): GraphNode {
-    return nodes[id] ?? {
-      id, type: 'item', display_name: id, era: null, learn_method: null,
-      book_sources: [], skill_requirements: [], proficiency_requirements: [],
-      craft_time: null, bottleneck_score: 0, spawn_class: null,
-      incomplete: true, pseudo: false,
-    };
-  }
-
-  // Build RF nodes (position filled by dagre)
+  // RF nodes
   const rfNodes: RFNode[] = [...seen].map((id) => ({
     id,
     position: { x: 0, y: 0 },
@@ -134,11 +171,11 @@ function buildLayoutedGraph(
     data: { graphNode: getNode(id), isRoot: id === rootId },
   }));
 
-  // Build RF edges
-  const rfEdges: RFEdge[] = collected.map(({ edge, isTreeEdge }, i) => ({
+  // RF edges
+  const rfEdges: RFEdge[] = collected.map(({ source, target, edge, isTreeEdge }, i) => ({
     id: `e${i}`,
-    source: edge.from,
-    target: edge.to,
+    source,
+    target,
     label: edge.quantity > 1 ? `${edge.quantity}×` : undefined,
     style: { stroke: EDGE_STROKE[edge.type] ?? '#64748b', strokeWidth: 1.5 },
     labelStyle: { fill: '#94a3b8', fontSize: 10 },
@@ -146,7 +183,7 @@ function buildLayoutedGraph(
     data: { isTreeEdge },
   }));
 
-  // Dagre layout — only tree edges (avoids cycle issues)
+  // Dagre layout — include all tree edges so meta nodes get meaningful Y positions
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
@@ -161,10 +198,28 @@ function buildLayoutedGraph(
 
   dagre.layout(g);
 
+  // For each meta node, find the rightmost right-edge among its direct parents.
+  // This places Chemistry 1 one column past the deepest item that needs it,
+  // rather than pinning everything to the global far right.
+  const metaParentRight = new Map<string, number>();
+  for (const { source, target } of collected) {
+    if (!isMeta(getNode(target).type)) continue;
+    const parentPos = g.node(source);
+    if (!parentPos) continue;
+    const parentRight = parentPos.x + nodeW(getNode(source).type) / 2;
+    metaParentRight.set(target, Math.max(metaParentRight.get(target) ?? 0, parentRight));
+  }
+
   const laidOut: RFNode[] = rfNodes.map((n) => {
     const type = (n.data.graphNode as GraphNode).type;
-    const { x, y } = g.node(n.id);
-    return { ...n, position: { x: x - nodeW(type) / 2, y: y - nodeH(type) / 2 } };
+    const pos = g.node(n.id);
+    if (!pos) return { ...n, position: { x: 0, y: 0 } };
+
+    if (isMeta(type)) {
+      const x = (metaParentRight.get(n.id) ?? 0) + META_RIGHT_GAP;
+      return { ...n, position: { x, y: pos.y - nodeH(type) / 2 } };
+    }
+    return { ...n, position: { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 } };
   });
 
   return { rfNodes: laidOut, rfEdges };
@@ -188,22 +243,80 @@ export default function GraphView({
   const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
 
+  // History stack — reset when an external root change arrives (new search)
+  const [history, setHistory] = useState<string[]>([rootNodeId]);
+  const [histIdx, setHistIdx] = useState(0);
+
+  useEffect(() => {
+    setHistory([rootNodeId]);
+    setHistIdx(0);
+  }, [rootNodeId]);
+
+  const currentRoot = history[histIdx];
+
+  function navigateTo(id: string) {
+    setHistory((prev) => [...prev.slice(0, histIdx + 1), id]);
+    setHistIdx((i) => i + 1);
+    onRootChange(id); // keep parent's selectedItemId in sync
+  }
+
+  const canBack = histIdx > 0;
+  const canForward = histIdx < history.length - 1;
+
   const { rfNodes, rfEdges } = useMemo(
-    () => buildLayoutedGraph(rootNodeId, activeDataset, graphIndex, maxHops, showMeta),
-    [rootNodeId, activeDataset, graphIndex, maxHops, showMeta],
+    () => buildLayoutedGraph(currentRoot, activeDataset, graphIndex, maxHops, showMeta),
+    [currentRoot, activeDataset, graphIndex, maxHops, showMeta],
   );
+
+  const currentNode = activeDataset.nodes[currentRoot];
 
   const handleNodeClick: NodeMouseHandler = (_evt, node) => {
     const gn = node.data.graphNode as GraphNode;
+    if (node.id === currentRoot) return;
+    // Only re-root on item/construction/practice — meta nodes are terminal
     if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
-      onRootChange(node.id);
+      navigateTo(node.id);
     }
   };
 
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+
+        {/* Back / forward */}
+        <button
+          onClick={() => setHistIdx((i) => i - 1)}
+          disabled={!canBack}
+          className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Back"
+        >
+          ←
+        </button>
+        <button
+          onClick={() => setHistIdx((i) => i + 1)}
+          disabled={!canForward}
+          className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Forward"
+        >
+          →
+        </button>
+
+        {/* Current item name */}
+        <span className="text-slate-200 font-medium truncate max-w-48">
+          {currentNode?.display_name ?? currentRoot}
+        </span>
+
+        {/* History breadcrumb count */}
+        {history.length > 1 && (
+          <span className="text-slate-600 text-xs">
+            {histIdx + 1} / {history.length}
+          </span>
+        )}
+
+        <div className="w-px h-4 bg-slate-700 mx-1" />
+
+        {/* Depth */}
         <span className="text-slate-500">Depth</span>
         <input
           type="range" min={1} max={6} value={maxHops}
@@ -212,7 +325,8 @@ export default function GraphView({
         />
         <span className="w-3 text-slate-400">{maxHops}</span>
 
-        <label className="flex items-center gap-1.5 cursor-pointer">
+        {/* Skills toggle */}
+        <label className="flex items-center gap-1.5 cursor-pointer ml-1">
           <input
             type="checkbox" checked={showMeta}
             onChange={(e) => setShowMeta(e.target.checked)}
@@ -221,7 +335,7 @@ export default function GraphView({
           Skills &amp; qualities
         </label>
 
-        <span className="ml-auto text-slate-500">
+        <span className="ml-auto text-slate-600">
           {rfNodes.length} nodes · {rfEdges.length} edges
         </span>
       </div>
@@ -229,7 +343,7 @@ export default function GraphView({
       {/* Canvas */}
       <div className="flex-1">
         <ReactFlow
-          key={rootNodeId}
+          key={currentRoot}
           nodes={rfNodes}
           edges={rfEdges}
           nodeTypes={NODE_TYPES}
