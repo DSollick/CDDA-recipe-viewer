@@ -52,7 +52,7 @@ export interface GraphData {
   experimental?: Dataset;
 }
 
-export type ViewMode = 'era' | 'tree' | 'bottlenecks';
+export type ViewMode = 'era' | 'tree' | 'graph' | 'bottlenecks';
 export type DatasetKey = 'stable' | 'experimental';
 
 // Adjacency index built from edges
