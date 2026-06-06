@@ -7,6 +7,7 @@ import EraGrid from './components/EraGrid';
 import DependencyTree from './components/DependencyTree';
 import NodeDetail from './components/NodeDetail';
 import BottleneckView from './components/BottleneckView';
+import GraphView from './components/GraphView';
 
 // Era display order
 const ERA_ORDER = [
@@ -57,7 +58,8 @@ export default function App() {
     setSelectedItemId(nodeId);
     setDetailNodeId(nodeId);
     setHoveredNodeId(null);
-    setView('tree');
+    // Stay in graph view if already there, else switch to tree
+    setView((v) => v === 'graph' ? 'graph' : 'tree');
   }
 
   function handleSelectEra(era: string) {
@@ -154,7 +156,7 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Era Sidebar */}
-        {view !== 'bottlenecks' && (
+        {view !== 'bottlenecks' && view !== 'graph' && (
           <EraSidebar
             eras={orderedEras}
             activeDataset={activeDataset}
@@ -172,6 +174,21 @@ export default function App() {
               activeDataset={activeDataset}
               onSelectItem={handleSelectItem}
             />
+          )}
+
+          {view === 'graph' && selectedItemId && activeDataset && graphIndex && (
+            <GraphView
+              rootNodeId={selectedItemId}
+              activeDataset={activeDataset}
+              graphIndex={graphIndex}
+              onRootChange={(id) => setSelectedItemId(id)}
+            />
+          )}
+
+          {view === 'graph' && !selectedItemId && (
+            <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+              Select an item from the era grid or search bar first.
+            </div>
           )}
 
           {view === 'era' && (

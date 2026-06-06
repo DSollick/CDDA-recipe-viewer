@@ -37,6 +37,9 @@ export default function Header({
         <NavBtn active={view === 'era' || view === 'tree'} onClick={() => setView('era')}>
           Browse
         </NavBtn>
+        <NavBtn active={view === 'graph'} onClick={() => setView('graph')}>
+          Graph
+        </NavBtn>
         <NavBtn active={view === 'bottlenecks'} onClick={() => setView('bottlenecks')}>
           Key Unlocks
         </NavBtn>
