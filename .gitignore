@@ -170,6 +170,7 @@ venv.bak/
 # Frontend build artifacts
 site/node_modules/
 site/dist/
+site/*.tsbuildinfo
 
 # mypy
 .mypy_cache/

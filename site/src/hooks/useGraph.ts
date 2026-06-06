@@ -27,7 +27,7 @@ export function useGraph(): UseGraphResult {
     setLoadState('loading');
     setErrorMessage(null);
 
-    fetch('/graph.json')
+    fetch(`${import.meta.env.BASE_URL}graph.json`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         return res.json() as Promise<GraphData>;
