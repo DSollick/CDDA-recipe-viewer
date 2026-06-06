@@ -241,6 +241,8 @@ def _populate_node_from_recipe(node: Node, recipe: dict) -> None:
         if isinstance(p, dict) and p.get("required", False)
     ]
     node.craft_time = recipe.get("time")
+    # Having a recipe means the item is defined well enough to present; clear stub flag.
+    node.incomplete = False
 
 
 # ---------------------------------------------------------------------------
