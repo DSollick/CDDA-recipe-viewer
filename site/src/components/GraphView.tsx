@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,7 +20,8 @@ import { Dataset, GraphIndex, GraphNode } from '../types';
 
 const ITEM_W = 164, ITEM_H = 42;
 const META_W = 152, META_H = 34;
-const META_RIGHT_GAP = 64; // gap between rightmost item column and meta column
+const META_GAP = 60;      // horizontal gap between rightmost parent and meta node
+const META_SPACING = 10;  // minimum vertical gap between meta nodes in the same column
 
 function isMeta(type: string) {
   return type === 'skill' || type === 'proficiency' || type === 'quality';
@@ -93,9 +94,8 @@ function buildLayoutedGraph(
 ): { rfNodes: RFNode[]; rfEdges: RFEdge[] } {
   const { nodes } = dataset;
 
-  // Synthetic level-specific skill nodes: "skill_chemistry_lvl_3"
-  // Created on the fly so the data model is untouched.
-  const syntheticNodes = new Map<string, GraphNode>(); // leveledId → synthetic GraphNode
+  // Synthetic level-specific skill nodes built at render time
+  const syntheticNodes = new Map<string, GraphNode>();
 
   function skillLevelId(baseId: string, level: number): string {
     return level > 0 ? `${baseId}_lvl_${level}` : baseId;
@@ -129,7 +129,7 @@ function buildLayoutedGraph(
     };
   }
 
-  // BFS
+  // BFS — item nodes only enqueued; meta nodes collected but not traversed
   const seen = new Set<string>([rootId]);
   type Coll = { source: string; target: string; edge: typeof dataset.edges[0]; isTreeEdge: boolean };
   const collected: Coll[] = [];
@@ -144,7 +144,6 @@ function buildLayoutedGraph(
       if (!edge.is_default) continue;
       if (!showMeta && edge.type !== 'requires_component') continue;
 
-      // For skill edges, create a level-specific target node ID
       const target =
         edge.type === 'requires_skill'
           ? ensureSkillLevelNode(edge.to, edge.quality_level ?? 0)
@@ -155,7 +154,7 @@ function buildLayoutedGraph(
 
       if (isTreeEdge) {
         seen.add(target);
-        // Don't enqueue meta nodes — they're leaves by definition
+        // Meta nodes are leaves — don't traverse into them
         if (!isMeta(getNode(target).type)) {
           queue.push({ id: target, depth: item.depth + 1 });
         }
@@ -163,7 +162,95 @@ function buildLayoutedGraph(
     }
   }
 
-  // RF nodes
+  // Split into item and meta node sets
+  const itemIds = new Set([...seen].filter((id) => !isMeta(getNode(id).type)));
+  const metaIds = new Set([...seen].filter((id) => isMeta(getNode(id).type)));
+
+  // ── Phase 1: Dagre layout for item nodes only ──────────────────────────────
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
+
+  for (const id of itemIds) {
+    const type = getNode(id).type;
+    g.setNode(id, { width: nodeW(type), height: nodeH(type) });
+  }
+  for (const { source, target, isTreeEdge } of collected) {
+    if (isTreeEdge && itemIds.has(source) && itemIds.has(target)) {
+      g.setEdge(source, target);
+    }
+  }
+
+  dagre.layout(g);
+
+  // ── Phase 2: Compute meta node positions ───────────────────────────────────
+  // X = rightmost parent's right-edge + META_GAP
+  // Y initial = average of all parent centre-Ys
+  type MetaAccum = { x: number; sumY: number; count: number };
+  const metaAccum = new Map<string, MetaAccum>();
+
+  for (const { source, target } of collected) {
+    if (!metaIds.has(target)) continue;
+    const parentPos = g.node(source);
+    if (!parentPos) continue;
+    const parentRight = parentPos.x + nodeW(getNode(source).type) / 2;
+    const existing = metaAccum.get(target);
+    if (!existing) {
+      metaAccum.set(target, { x: parentRight + META_GAP, sumY: parentPos.y, count: 1 });
+    } else {
+      metaAccum.set(target, {
+        x: Math.max(existing.x, parentRight + META_GAP),
+        sumY: existing.sumY + parentPos.y,
+        count: existing.count + 1,
+      });
+    }
+  }
+
+  // ── Phase 3: Vertical stacking within each X column ───────────────────────
+  // Group meta nodes by their computed X, sort by natural Y, then push apart.
+  const byX = new Map<number, string[]>();
+  for (const [id, accum] of metaAccum) {
+    const col = accum.x;
+    if (!byX.has(col)) byX.set(col, []);
+    byX.get(col)!.push(id);
+  }
+
+  const finalMetaPos = new Map<string, { x: number; y: number }>();
+  const rowH = META_H + META_SPACING;
+
+  for (const [col, ids] of byX) {
+    ids.sort((a, b) => {
+      const ya = metaAccum.get(a)!;
+      const yb = metaAccum.get(b)!;
+      return ya.sumY / ya.count - yb.sumY / yb.count;
+    });
+
+    // Place each node; push downward if it would overlap the previous
+    let prevBottom = -Infinity;
+    for (const id of ids) {
+      const acc = metaAccum.get(id)!;
+      const naturalY = acc.sumY / acc.count;
+      const y = Math.max(naturalY, prevBottom + META_H / 2 + META_SPACING);
+      finalMetaPos.set(id, { x: col, y });
+      prevBottom = y + META_H / 2;
+    }
+
+    // Centre the column around the natural midpoint to avoid drifting down
+    const naturalMid = ids.reduce((s, id) => {
+      const a = metaAccum.get(id)!;
+      return s + a.sumY / a.count;
+    }, 0) / ids.length;
+    const layoutMid = (finalMetaPos.get(ids[0])!.y + finalMetaPos.get(ids[ids.length - 1])!.y) / 2;
+    const shift = naturalMid - layoutMid;
+    for (const id of ids) {
+      const p = finalMetaPos.get(id)!;
+      finalMetaPos.set(id, { x: p.x, y: p.y + shift });
+    }
+
+    void rowH; // suppress unused-var warning
+  }
+
+  // ── Phase 4: Assemble RF nodes with final positions ────────────────────────
   const rfNodes: RFNode[] = [...seen].map((id) => ({
     id,
     position: { x: 0, y: 0 },
@@ -171,7 +258,6 @@ function buildLayoutedGraph(
     data: { graphNode: getNode(id), isRoot: id === rootId },
   }));
 
-  // RF edges
   const rfEdges: RFEdge[] = collected.map(({ source, target, edge, isTreeEdge }, i) => ({
     id: `e${i}`,
     source,
@@ -183,42 +269,15 @@ function buildLayoutedGraph(
     data: { isTreeEdge },
   }));
 
-  // Dagre layout — include all tree edges so meta nodes get meaningful Y positions
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
-
-  for (const n of rfNodes) {
-    const type = (n.data.graphNode as GraphNode).type;
-    g.setNode(n.id, { width: nodeW(type), height: nodeH(type) });
-  }
-  for (const e of rfEdges) {
-    if (e.data?.isTreeEdge) g.setEdge(e.source, e.target);
-  }
-
-  dagre.layout(g);
-
-  // For each meta node, find the rightmost right-edge among its direct parents.
-  // This places Chemistry 1 one column past the deepest item that needs it,
-  // rather than pinning everything to the global far right.
-  const metaParentRight = new Map<string, number>();
-  for (const { source, target } of collected) {
-    if (!isMeta(getNode(target).type)) continue;
-    const parentPos = g.node(source);
-    if (!parentPos) continue;
-    const parentRight = parentPos.x + nodeW(getNode(source).type) / 2;
-    metaParentRight.set(target, Math.max(metaParentRight.get(target) ?? 0, parentRight));
-  }
-
   const laidOut: RFNode[] = rfNodes.map((n) => {
-    const type = (n.data.graphNode as GraphNode).type;
+    const type = getNode(n.id).type;
+    if (isMeta(type)) {
+      const pos = finalMetaPos.get(n.id);
+      if (!pos) return { ...n, position: { x: 0, y: 0 } };
+      return { ...n, position: { x: pos.x, y: pos.y - META_H / 2 } };
+    }
     const pos = g.node(n.id);
     if (!pos) return { ...n, position: { x: 0, y: 0 } };
-
-    if (isMeta(type)) {
-      const x = (metaParentRight.get(n.id) ?? 0) + META_RIGHT_GAP;
-      return { ...n, position: { x, y: pos.y - nodeH(type) / 2 } };
-    }
     return { ...n, position: { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 } };
   });
 
@@ -243,25 +302,32 @@ export default function GraphView({
   const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
 
-  // History stack — reset when an external root change arrives (new search)
+  // History stack.
+  // Problem: navigateTo → onRootChange → parent sets selectedItemId → rootNodeId prop
+  // changes → useEffect would reset history. Use a ref to suppress that reset.
   const [history, setHistory] = useState<string[]>([rootNodeId]);
   const [histIdx, setHistIdx] = useState(0);
+  const suppressReset = useRef(false);
 
   useEffect(() => {
+    if (suppressReset.current) {
+      suppressReset.current = false;
+      return;
+    }
     setHistory([rootNodeId]);
     setHistIdx(0);
   }, [rootNodeId]);
 
   const currentRoot = history[histIdx];
+  const canBack = histIdx > 0;
+  const canForward = histIdx < history.length - 1;
 
   function navigateTo(id: string) {
     setHistory((prev) => [...prev.slice(0, histIdx + 1), id]);
     setHistIdx((i) => i + 1);
-    onRootChange(id); // keep parent's selectedItemId in sync
+    suppressReset.current = true;
+    onRootChange(id);
   }
-
-  const canBack = histIdx > 0;
-  const canForward = histIdx < history.length - 1;
 
   const { rfNodes, rfEdges } = useMemo(
     () => buildLayoutedGraph(currentRoot, activeDataset, graphIndex, maxHops, showMeta),
@@ -271,9 +337,8 @@ export default function GraphView({
   const currentNode = activeDataset.nodes[currentRoot];
 
   const handleNodeClick: NodeMouseHandler = (_evt, node) => {
-    const gn = node.data.graphNode as GraphNode;
     if (node.id === currentRoot) return;
-    // Only re-root on item/construction/practice — meta nodes are terminal
+    const gn = node.data.graphNode as GraphNode;
     if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
       navigateTo(node.id);
     }
@@ -283,40 +348,28 @@ export default function GraphView({
     <div className="flex flex-col h-full">
       {/* Controls */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
-
-        {/* Back / forward */}
         <button
           onClick={() => setHistIdx((i) => i - 1)}
           disabled={!canBack}
           className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           title="Back"
-        >
-          ←
-        </button>
+        >←</button>
         <button
           onClick={() => setHistIdx((i) => i + 1)}
           disabled={!canForward}
           className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           title="Forward"
-        >
-          →
-        </button>
+        >→</button>
 
-        {/* Current item name */}
         <span className="text-slate-200 font-medium truncate max-w-48">
           {currentNode?.display_name ?? currentRoot}
         </span>
-
-        {/* History breadcrumb count */}
         {history.length > 1 && (
-          <span className="text-slate-600 text-xs">
-            {histIdx + 1} / {history.length}
-          </span>
+          <span className="text-slate-600">{histIdx + 1} / {history.length}</span>
         )}
 
         <div className="w-px h-4 bg-slate-700 mx-1" />
 
-        {/* Depth */}
         <span className="text-slate-500">Depth</span>
         <input
           type="range" min={1} max={6} value={maxHops}
@@ -325,7 +378,6 @@ export default function GraphView({
         />
         <span className="w-3 text-slate-400">{maxHops}</span>
 
-        {/* Skills toggle */}
         <label className="flex items-center gap-1.5 cursor-pointer ml-1">
           <input
             type="checkbox" checked={showMeta}
