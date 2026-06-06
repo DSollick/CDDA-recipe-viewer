@@ -229,7 +229,10 @@ function TreeNodeRow({
           <span className="text-xs text-slate-500 italic ml-1">(see above)</span>
         )}
 
-        {/* Incomplete */}
+        {/* Pseudo / incomplete */}
+        {node?.pseudo && (
+          <span className="text-xs text-violet-400 ml-1">pseudo</span>
+        )}
         {node?.incomplete && (
           <span className="text-xs text-red-400 ml-1">incomplete</span>
         )}

@@ -80,8 +80,9 @@ export function buildTreeNode(
 
   const depEdges = getDependencyEdges(nodeId, index);
 
-  // Non-component deps: skill, proficiency, tool_quality
-  const nonCompEdges = depEdges.filter((e) => e.type !== 'requires_component');
+  // Non-component deps: skill, proficiency, tool_quality — primary recipe only.
+  // Secondary recipes share the same node but have is_default=false on their edges.
+  const nonCompEdges = depEdges.filter((e) => e.type !== 'requires_component' && e.is_default);
   const nonComponentChildren: TreeNode[] = nonCompEdges.map((e) =>
     buildTreeNode(e.to, e, null, index, nodes, nextAncestors, depth + 1, maxDepth)
   );

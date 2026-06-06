@@ -78,6 +78,7 @@ class Node:
     bottleneck_score: int = 0                          # filled by bottlenecks.py
     spawn_class: str | None = None                     # filled by spawn.py
     incomplete: bool = False
+    pseudo: bool = False
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -191,10 +192,12 @@ def build(resolved: "ResolvedData") -> Graph:
 # ---------------------------------------------------------------------------
 
 def _make_item_node(item_id: str, item: dict) -> Node:
+    flags = item.get("flags", [])
     return Node(
         id=item_id,
         type="item",
         display_name=_display_name(item),
+        pseudo="PSEUDO" in flags,
     )
 
 

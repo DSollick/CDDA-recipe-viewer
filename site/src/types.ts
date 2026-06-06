@@ -11,6 +11,7 @@ export interface GraphNode {
   bottleneck_score: number;
   spawn_class: string | null;
   incomplete: boolean;
+  pseudo: boolean;
 }
 
 export interface GraphEdge {
