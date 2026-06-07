@@ -20,8 +20,6 @@ import { Dataset, GraphIndex, GraphNode } from '../types';
 
 const ITEM_W = 164, ITEM_H = 42;
 const META_W = 152, META_H = 34;
-const META_GAP = 60;      // horizontal gap between rightmost parent and meta node
-const META_SPACING = 10;  // minimum vertical gap between meta nodes in the same column
 
 function isMeta(type: string) {
   return type === 'skill' || type === 'proficiency' || type === 'quality';
@@ -162,101 +160,34 @@ function buildLayoutedGraph(
     }
   }
 
-  // Split into item and meta node sets
-  const itemIds = new Set([...seen].filter((id) => !isMeta(getNode(id).type)));
-  const metaIds = new Set([...seen].filter((id) => isMeta(getNode(id).type)));
-
-  // ── Phase 1: Dagre layout for item nodes only ──────────────────────────────
+  // ── Dagre layout for all nodes ────────────────────────────────────────────
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
 
-  for (const id of itemIds) {
+  for (const id of seen) {
     const type = getNode(id).type;
     g.setNode(id, { width: nodeW(type), height: nodeH(type) });
   }
   for (const { source, target, isTreeEdge } of collected) {
-    if (isTreeEdge && itemIds.has(source) && itemIds.has(target)) {
-      g.setEdge(source, target);
-    }
+    if (isTreeEdge) g.setEdge(source, target);
   }
 
   dagre.layout(g);
 
-  // ── Phase 2: Compute meta node positions ───────────────────────────────────
-  // X = rightmost parent's right-edge + META_GAP
-  // Y initial = average of all parent centre-Ys
-  type MetaAccum = { x: number; sumY: number; count: number };
-  const metaAccum = new Map<string, MetaAccum>();
-
-  for (const { source, target } of collected) {
-    if (!metaIds.has(target)) continue;
-    const parentPos = g.node(source);
-    if (!parentPos) continue;
-    const parentRight = parentPos.x + nodeW(getNode(source).type) / 2;
-    const existing = metaAccum.get(target);
-    if (!existing) {
-      metaAccum.set(target, { x: parentRight + META_GAP, sumY: parentPos.y, count: 1 });
-    } else {
-      metaAccum.set(target, {
-        x: Math.max(existing.x, parentRight + META_GAP),
-        sumY: existing.sumY + parentPos.y,
-        count: existing.count + 1,
-      });
-    }
-  }
-
-  // ── Phase 3: Vertical stacking within each X column ───────────────────────
-  // Group meta nodes by their computed X, sort by natural Y, then push apart.
-  const byX = new Map<number, string[]>();
-  for (const [id, accum] of metaAccum) {
-    const col = accum.x;
-    if (!byX.has(col)) byX.set(col, []);
-    byX.get(col)!.push(id);
-  }
-
-  const finalMetaPos = new Map<string, { x: number; y: number }>();
-  const rowH = META_H + META_SPACING;
-
-  for (const [col, ids] of byX) {
-    ids.sort((a, b) => {
-      const ya = metaAccum.get(a)!;
-      const yb = metaAccum.get(b)!;
-      return ya.sumY / ya.count - yb.sumY / yb.count;
-    });
-
-    // Place each node; push downward if it would overlap the previous
-    let prevBottom = -Infinity;
-    for (const id of ids) {
-      const acc = metaAccum.get(id)!;
-      const naturalY = acc.sumY / acc.count;
-      const y = Math.max(naturalY, prevBottom + META_H / 2 + META_SPACING);
-      finalMetaPos.set(id, { x: col, y });
-      prevBottom = y + META_H / 2;
-    }
-
-    // Centre the column around the natural midpoint to avoid drifting down
-    const naturalMid = ids.reduce((s, id) => {
-      const a = metaAccum.get(id)!;
-      return s + a.sumY / a.count;
-    }, 0) / ids.length;
-    const layoutMid = (finalMetaPos.get(ids[0])!.y + finalMetaPos.get(ids[ids.length - 1])!.y) / 2;
-    const shift = naturalMid - layoutMid;
-    for (const id of ids) {
-      const p = finalMetaPos.get(id)!;
-      finalMetaPos.set(id, { x: p.x, y: p.y + shift });
-    }
-
-    void rowH; // suppress unused-var warning
-  }
-
-  // ── Phase 4: Assemble RF nodes with final positions ────────────────────────
-  const rfNodes: RFNode[] = [...seen].map((id) => ({
-    id,
-    position: { x: 0, y: 0 },
-    type: 'cdda',
-    data: { graphNode: getNode(id), isRoot: id === rootId },
-  }));
+  // ── Assemble RF nodes and edges ────────────────────────────────────────────
+  const rfNodes: RFNode[] = [...seen].map((id) => {
+    const type = getNode(id).type;
+    const pos = g.node(id);
+    return {
+      id,
+      type: 'cdda',
+      position: pos
+        ? { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 }
+        : { x: 0, y: 0 },
+      data: { graphNode: getNode(id), isRoot: id === rootId },
+    };
+  });
 
   const rfEdges: RFEdge[] = collected.map(({ source, target, edge, isTreeEdge }, i) => ({
     id: `e${i}`,
@@ -269,19 +200,7 @@ function buildLayoutedGraph(
     data: { isTreeEdge },
   }));
 
-  const laidOut: RFNode[] = rfNodes.map((n) => {
-    const type = getNode(n.id).type;
-    if (isMeta(type)) {
-      const pos = finalMetaPos.get(n.id);
-      if (!pos) return { ...n, position: { x: 0, y: 0 } };
-      return { ...n, position: { x: pos.x, y: pos.y - META_H / 2 } };
-    }
-    const pos = g.node(n.id);
-    if (!pos) return { ...n, position: { x: 0, y: 0 } };
-    return { ...n, position: { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 } };
-  });
-
-  return { rfNodes: laidOut, rfEdges };
+  return { rfNodes, rfEdges };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
