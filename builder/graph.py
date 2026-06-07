@@ -122,9 +122,13 @@ def build(resolved: "ResolvedData") -> Graph:
     nodes: dict[str, Node] = {}
     edges: list[Edge] = []
 
-    # Seed item nodes for everything in resolved.items
+    # Seed item nodes — if an item ID also exists as an item_group, the group wins
+    # (CDDA pseudo-items like surface_heat are defined as both an item and a group)
     for item_id, item in resolved.items.items():
-        nodes[item_id] = _make_item_node(item_id, item)
+        if item_id in resolved.item_groups:
+            _ensure_group_node(item_id, resolved.item_groups, nodes)
+        else:
+            nodes[item_id] = _make_item_node(item_id, item)
 
     # --- Crafting recipes ---
     # Group by result item so we can pick a primary recipe per item

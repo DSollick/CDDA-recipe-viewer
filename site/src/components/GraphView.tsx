@@ -34,7 +34,7 @@ const DOT_COLOR: Record<string, string> = {
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
-  group: 'bg-cyan-400',
+  group: 'bg-green-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
@@ -353,7 +353,7 @@ export default function GraphView({
         {selectedMetaNode && (
           <div className="absolute top-3 right-3 w-56 bg-slate-800 border border-slate-600 rounded shadow-xl text-xs text-slate-300 flex flex-col max-h-[70%]">
             <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 shrink-0">
-              <span className={`font-semibold ${selectedMetaNode.type === 'group' ? 'text-cyan-300' : 'text-purple-300'}`}>
+              <span className={`font-semibold ${selectedMetaNode.type === 'group' ? 'text-green-300' : 'text-purple-300'}`}>
                 {selectedMetaNode.display_name}
               </span>
               <button
