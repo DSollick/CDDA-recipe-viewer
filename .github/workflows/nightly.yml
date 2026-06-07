@@ -48,9 +48,8 @@ jobs:
         run: npm run build
         working-directory: site
         env:
-          # Matches the GitHub Pages sub-path for this repo.
-          # Change to '/' if you add a custom domain.
           VITE_BASE_URL: /CDDA-recipe-viewer/
+          VITE_DEPLOY_SHA: ${{ github.sha }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

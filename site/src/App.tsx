@@ -149,8 +149,11 @@ export default function App() {
 
       {/* Data banner */}
       {dataBanner && (
-        <div className="bg-slate-800 border-b border-slate-700 px-4 py-1 text-xs text-slate-400">
-          {dataBanner}
+        <div className="bg-slate-800 border-b border-slate-700 px-4 py-1 text-xs text-slate-400 flex items-center gap-3">
+          <span>{dataBanner}</span>
+          {import.meta.env.VITE_DEPLOY_SHA && (
+            <span className="text-slate-600">site {import.meta.env.VITE_DEPLOY_SHA.slice(0, 7)}</span>
+          )}
         </div>
       )}
 
