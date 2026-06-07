@@ -194,13 +194,6 @@ def build(resolved: "ResolvedData") -> Graph:
         inlined = _inline_using(prac, resolved.requirements)
         edges.extend(_craft_edges(prac_id, prac_id, inlined, True, nodes, resolved))
 
-    # --- Reclassify virtual tool stubs ---
-    # Incomplete item stubs that are ONLY ever used as non-consumed tool requirements
-    # (qty=-1) are CDDA pseudo-items like surface_heat / fire that have a type our
-    # loader skips (e.g. "TOOL" in legacy data). Treat them as group nodes so they
-    # render as green virtual-requirement nodes instead of blue incomplete item stubs.
-    _reclassify_virtual_tool_nodes(nodes, edges)
-
     # --- Quality providers ---
     # Scan all items for their "qualities" field and build a reverse map:
     # qual_node_id → sorted list of item IDs that provide that quality at that level or higher.
@@ -237,11 +230,18 @@ def build(resolved: "ResolvedData") -> Graph:
             quality_providers[node_id] = sorted(set(providers))
 
     # --- Group providers ---
+    # A group node comes from either a CDDA item_group or a LIST requirement;
+    # flatten whichever source applies into its member/provider item IDs.
     group_providers: dict[str, list[str]] = {}
     for node_id, node in nodes.items():
         if node.type != "group":
             continue
-        members = _flatten_group_members(node_id, resolved.item_groups)
+        if node_id in resolved.item_groups:
+            members = _flatten_group_members(node_id, resolved.item_groups)
+        elif node_id in resolved.requirements:
+            members = _flatten_requirement_providers(node_id, resolved.requirements)
+        else:
+            members = []
         # Only include members that exist as actual items (skip nested groups / unknowns)
         known = [m for m in members if m in resolved.items]
         if known:
@@ -330,10 +330,9 @@ def _craft_edges(
     # Component edges — three-level list: [slot[alternative[item_id, qty, ?qualifier]]]
     for slot in recipe.get("components", []):
         for alt_idx, entry in enumerate(slot):
-            item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
+            target_id, qty = _resolve_dep_target(entry, nodes, resolved, recipe_key)
             edges.append(Edge(
-                from_node=from_node, to_node=item_id,
+                from_node=from_node, to_node=target_id,
                 type="requires_component",
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
@@ -345,10 +344,9 @@ def _craft_edges(
     # Specific tool edges — same list structure; qty=-1 means not consumed
     for slot in recipe.get("tools", []):
         for alt_idx, entry in enumerate(slot):
-            item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
+            target_id, qty = _resolve_dep_target(entry, nodes, resolved, recipe_key)
             edges.append(Edge(
-                from_node=from_node, to_node=item_id,
+                from_node=from_node, to_node=target_id,
                 type="requires_component",
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
@@ -502,36 +500,83 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
 
 
 # ---------------------------------------------------------------------------
-# Post-processing helpers
-# ---------------------------------------------------------------------------
-
-def _reclassify_virtual_tool_nodes(nodes: dict[str, Node], edges: list[Edge]) -> None:
-    """
-    Incomplete stubs that appear ONLY as non-consumed tool requirements (qty=-1)
-    are virtual CDDA pseudo-items (surface_heat, fire, etc.) whose type our loader
-    skips because they use legacy CDDA type strings like "TOOL".  Re-type them as
-    "group" so they render as green virtual-requirement nodes.
-    """
-    # Collect all quantities at which each node is referenced as a component
-    qty_by_node: dict[str, set[int]] = {}
-    for edge in edges:
-        if edge.type == "requires_component":
-            qty_by_node.setdefault(edge.to_node, set()).add(edge.quantity)
-
-    for node_id, qtys in qty_by_node.items():
-        node = nodes.get(node_id)
-        if node and node.incomplete and qtys == {-1}:
-            # Exclusively a non-consumed tool — virtual requirement
-            node.type = "group"
-            # Stub display_name is the raw id; make it human-readable
-            node.display_name = node_id.replace("_", " ").title()
-            node.incomplete = False
-            log.info("Reclassified virtual tool stub %r as group node", node_id)
-
-
-# ---------------------------------------------------------------------------
 # Node-ensure helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_dep_target(
+    entry: list,
+    nodes: dict[str, Node],
+    resolved: "ResolvedData",
+    recipe_key: str,
+) -> tuple[str, int]:
+    """
+    Resolve a single component/tool entry to (target_node_id, quantity), creating
+    the appropriate node.
+
+    An entry is ``[id, qty]`` or ``[id, qty, qualifier]``.  When the qualifier is
+    ``"LIST"`` the id refers to a CDDA *requirement* object (e.g. ``surface_heat``,
+    ``adhesive``, ``any_butter``) — a virtual group of interchangeable items/tools,
+    not a concrete item.  These become green ``group`` nodes; everything else is a
+    normal item node.
+    """
+    dep_id, qty = entry[0], entry[1]
+    is_list = len(entry) >= 3 and entry[2] == "LIST"
+    if is_list and dep_id in resolved.requirements:
+        _ensure_requirement_group_node(dep_id, resolved.requirements, nodes)
+    else:
+        _ensure_item_node(
+            dep_id, resolved.items, nodes,
+            source=recipe_key, item_groups=resolved.item_groups,
+        )
+    return dep_id, qty
+
+
+def _ensure_requirement_group_node(
+    req_id: str,
+    requirements: dict,
+    nodes: dict[str, Node],
+) -> None:
+    """Create (or upgrade a stub into) a green group node for a LIST requirement."""
+    existing = nodes.get(req_id)
+    if existing is not None and not existing.incomplete:
+        return
+    req = requirements.get(req_id, {})
+    display = _display_name(req) if req else req_id
+    nodes[req_id] = Node(id=req_id, type="group", display_name=display)
+
+
+def _flatten_requirement_providers(
+    req_id: str,
+    requirements: dict,
+    _seen: set | None = None,
+) -> list[str]:
+    """
+    Flatten a requirement's components + tools into the list of item IDs that can
+    satisfy it.  Nested LIST references to other requirements are expanded
+    recursively (cycle-safe).
+    """
+    if _seen is None:
+        _seen = set()
+    if req_id in _seen:
+        return []
+    _seen.add(req_id)
+
+    req = requirements.get(req_id, {})
+    providers: list[str] = []
+    for field in ("components", "tools"):
+        for slot in req.get(field, []) or []:
+            if not isinstance(slot, list):
+                continue
+            for entry in slot:
+                if not (isinstance(entry, list) and entry):
+                    continue
+                sub_id = str(entry[0])
+                if len(entry) >= 3 and entry[2] == "LIST":
+                    providers.extend(_flatten_requirement_providers(sub_id, requirements, _seen))
+                else:
+                    providers.append(sub_id)
+    return list(dict.fromkeys(providers))
+
 
 def _ensure_item_node(
     item_id: str,
