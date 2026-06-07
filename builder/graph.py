@@ -304,7 +304,7 @@ def _craft_edges(
     for slot in recipe.get("components", []):
         for alt_idx, entry in enumerate(slot):
             item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes)
+            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key)
             edges.append(Edge(
                 from_node=from_node, to_node=item_id,
                 type="requires_component",
@@ -319,7 +319,7 @@ def _craft_edges(
     for slot in recipe.get("tools", []):
         for alt_idx, entry in enumerate(slot):
             item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes)
+            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key)
             edges.append(Edge(
                 from_node=from_node, to_node=item_id,
                 type="requires_component",
@@ -478,12 +478,14 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
 # Node-ensure helpers
 # ---------------------------------------------------------------------------
 
-def _ensure_item_node(item_id: str, items: dict, nodes: dict[str, Node]) -> None:
+def _ensure_item_node(item_id: str, items: dict, nodes: dict[str, Node], *, source: str = "") -> None:
     if item_id not in nodes:
         item = items.get(item_id)
         if item:
             nodes[item_id] = _make_item_node(item_id, item)
         else:
+            log.warning("Unknown item %r referenced as component%s — created incomplete stub",
+                        item_id, f" in recipe {source!r}" if source else "")
             nodes[item_id] = Node(id=item_id, type="item", display_name=item_id, incomplete=True)
 
 
