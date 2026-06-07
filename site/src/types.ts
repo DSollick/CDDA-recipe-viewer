@@ -35,6 +35,7 @@ export interface Dataset {
   edges: GraphEdge[];
   eras: Record<string, string[]>; // era_name → [node_id, ...]
   bottlenecks: string[]; // top-20 node IDs by bottleneck_score
+  quality_providers: Record<string, string[]>; // qual_node_id → item IDs that satisfy it
 }
 
 export interface GraphMeta {

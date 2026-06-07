@@ -109,6 +109,7 @@ class Edge:
 class Graph:
     nodes: dict[str, Node]
     edges: list[Edge]
+    quality_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +185,42 @@ def build(resolved: "ResolvedData") -> Graph:
         inlined = _inline_using(prac, resolved.requirements)
         edges.extend(_craft_edges(prac_id, prac_id, inlined, True, nodes, resolved))
 
-    return Graph(nodes=nodes, edges=edges)
+    # --- Quality providers ---
+    # Scan all items for their "qualities" field and build a reverse map:
+    # qual_node_id → sorted list of item IDs that provide that quality at that level or higher.
+    _raw: dict[str, dict[int, list[str]]] = {}  # qual_id → {exact_level → [item_ids]}
+    for item_id, item in resolved.items.items():
+        for q in item.get("qualities", []):
+            if isinstance(q, (list, tuple)) and len(q) >= 2:
+                qual_id, level = str(q[0]), int(q[1])
+            elif isinstance(q, dict):
+                qual_id, level = str(q["id"]), int(q.get("level", 1))
+            else:
+                continue
+            _raw.setdefault(qual_id, {}).setdefault(level, []).append(item_id)
+
+    quality_providers: dict[str, list[str]] = {}
+    for node_id, node in nodes.items():
+        if node.type != "quality":
+            continue
+        # node_id format: qual_{qual_id}_{level}
+        suffix = node_id[5:]  # strip "qual_" prefix
+        last_sep = suffix.rfind("_")
+        if last_sep < 0:
+            continue
+        qual_id = suffix[:last_sep]
+        try:
+            min_level = int(suffix[last_sep + 1:])
+        except ValueError:
+            continue
+        providers: list[str] = []
+        for lvl, items in _raw.get(qual_id, {}).items():
+            if lvl >= min_level:
+                providers.extend(items)
+        if providers:
+            quality_providers[node_id] = sorted(set(providers))
+
+    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers)
 
 
 # ---------------------------------------------------------------------------

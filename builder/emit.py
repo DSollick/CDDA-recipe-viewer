@@ -73,10 +73,9 @@ def _dataset(graph: "Graph") -> dict:
     return {
         "nodes": nodes,
         "edges": edges,
-        # Derive era buckets from node.era written by eras.annotate().
-        # If annotate() was never called all eras are None and this is {}.
         "eras": _build_era_buckets(graph),
         "bottlenecks": bottlenecks,
+        "quality_providers": graph.quality_providers,
     }
 
 
