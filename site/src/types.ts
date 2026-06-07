@@ -1,6 +1,6 @@
 export interface GraphNode {
   id: string;
-  type: 'item' | 'construction' | 'disassembly' | 'practice' | 'quality' | 'skill' | 'proficiency';
+  type: 'item' | 'construction' | 'disassembly' | 'practice' | 'quality' | 'skill' | 'proficiency' | 'group';
   display_name: string;
   era: string | null;
   learn_method: string | null; // 'autolearn' | 'book' | 'practice' | null
@@ -36,6 +36,7 @@ export interface Dataset {
   eras: Record<string, string[]>; // era_name → [node_id, ...]
   bottlenecks: string[]; // top-20 node IDs by bottleneck_score
   quality_providers: Record<string, string[]>; // qual_node_id → item IDs that satisfy it
+  group_providers: Record<string, string[]>;   // group_id → member item IDs
 }
 
 export interface GraphMeta {

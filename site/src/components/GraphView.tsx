@@ -22,7 +22,7 @@ const ITEM_W = 164, ITEM_H = 42;
 const META_W = 152, META_H = 34;
 
 function isMeta(type: string) {
-  return type === 'skill' || type === 'proficiency' || type === 'quality';
+  return type === 'skill' || type === 'proficiency' || type === 'quality' || type === 'group';
 }
 function nodeW(type: string) { return isMeta(type) ? META_W : ITEM_W; }
 function nodeH(type: string) { return isMeta(type) ? META_H : ITEM_H; }
@@ -34,6 +34,7 @@ const DOT_COLOR: Record<string, string> = {
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
+  group: 'bg-cyan-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
@@ -268,7 +269,7 @@ export default function GraphView({
     if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
       setSelectedMetaId(null);
       navigateTo(node.id);
-    } else if (gn.type === 'quality') {
+    } else if (gn.type === 'quality' || gn.type === 'group') {
       setSelectedMetaId((prev) => (prev === node.id ? null : node.id));
     }
   };
@@ -277,7 +278,7 @@ export default function GraphView({
     activeDataset.nodes[selectedMetaId] ?? rfNodes.find((n) => n.id === selectedMetaId)?.data.graphNode as GraphNode | undefined
   ) : null;
   const providerIds: string[] = selectedMetaId
-    ? (activeDataset.quality_providers?.[selectedMetaId] ?? [])
+    ? (activeDataset.quality_providers?.[selectedMetaId] ?? activeDataset.group_providers?.[selectedMetaId] ?? [])
     : [];
 
   return (
@@ -352,7 +353,9 @@ export default function GraphView({
         {selectedMetaNode && (
           <div className="absolute top-3 right-3 w-56 bg-slate-800 border border-slate-600 rounded shadow-xl text-xs text-slate-300 flex flex-col max-h-[70%]">
             <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 shrink-0">
-              <span className="font-semibold text-purple-300">{selectedMetaNode.display_name}</span>
+              <span className={`font-semibold ${selectedMetaNode.type === 'group' ? 'text-cyan-300' : 'text-purple-300'}`}>
+                {selectedMetaNode.display_name}
+              </span>
               <button
                 onClick={() => setSelectedMetaId(null)}
                 className="text-slate-500 hover:text-slate-200 transition-colors ml-2"
@@ -362,7 +365,9 @@ export default function GraphView({
               <p className="px-3 py-2 text-slate-500">No provider data available.</p>
             ) : (
               <>
-                <p className="px-3 pt-2 pb-1 text-slate-500 shrink-0">Items providing this quality:</p>
+                <p className="px-3 pt-2 pb-1 text-slate-500 shrink-0">
+                  {selectedMetaNode.type === 'group' ? 'Items in this group:' : 'Items providing this quality:'}
+                </p>
                 <ul className="overflow-y-auto px-3 pb-2 space-y-0.5">
                   {providerIds.map((id) => {
                     const n = activeDataset.nodes[id];
