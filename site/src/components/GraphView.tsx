@@ -92,21 +92,17 @@ function buildLayoutedGraph(
 ): { rfNodes: RFNode[]; rfEdges: RFEdge[] } {
   const { nodes } = dataset;
 
-  // Synthetic level-specific skill nodes built at render time
+  // Synthetic level-specific nodes (skills and tool qualities) built at render time
   const syntheticNodes = new Map<string, GraphNode>();
 
-  function skillLevelId(baseId: string, level: number): string {
-    return level > 0 ? `${baseId}_lvl_${level}` : baseId;
-  }
-
-  function ensureSkillLevelNode(baseId: string, level: number): string {
-    const id = skillLevelId(baseId, level);
+  function ensureLevelNode(baseId: string, level: number, fallbackType: GraphNode['type']): string {
+    const id = level > 0 ? `${baseId}_lvl_${level}` : baseId;
     if (!syntheticNodes.has(id) && !nodes[id]) {
       const base = nodes[baseId];
-      const baseName = base?.display_name ?? baseId.replace('skill_', '');
+      const baseName = base?.display_name ?? baseId.replace(/^(?:skill|quality)_/, '');
       syntheticNodes.set(id, {
         ...(base ?? {
-          id, type: 'skill' as const, era: null, learn_method: null,
+          id, type: fallbackType, era: null, learn_method: null,
           book_sources: [], skill_requirements: [], proficiency_requirements: [],
           craft_time: null, bottleneck_score: 0, spawn_class: null,
           incomplete: false, pseudo: false,
@@ -142,9 +138,11 @@ function buildLayoutedGraph(
       if (!edge.is_default) continue;
       if (!showMeta && edge.type !== 'requires_component') continue;
 
+      // Skill nodes have no level in their ID — create a synthetic level-specific node.
+      // Quality nodes already encode the level in their ID (qual_CUT_2), so use edge.to directly.
       const target =
         edge.type === 'requires_skill'
-          ? ensureSkillLevelNode(edge.to, edge.quality_level ?? 0)
+          ? ensureLevelNode(edge.to, edge.quality_level ?? 0, 'skill')
           : edge.to;
 
       const isTreeEdge = !seen.has(target);
@@ -220,6 +218,7 @@ export default function GraphView({
 }: GraphViewProps) {
   const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
+  const [selectedMetaId, setSelectedMetaId] = useState<string | null>(null);
 
   // History stack.
   // Problem: navigateTo → onRootChange → parent sets selectedItemId → rootNodeId prop
@@ -259,9 +258,19 @@ export default function GraphView({
     if (node.id === currentRoot) return;
     const gn = node.data.graphNode as GraphNode;
     if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
+      setSelectedMetaId(null);
       navigateTo(node.id);
+    } else if (gn.type === 'quality') {
+      setSelectedMetaId((prev) => (prev === node.id ? null : node.id));
     }
   };
+
+  const selectedMetaNode = selectedMetaId ? (
+    activeDataset.nodes[selectedMetaId] ?? rfNodes.find((n) => n.id === selectedMetaId)?.data.graphNode as GraphNode | undefined
+  ) : null;
+  const providerIds: string[] = selectedMetaId
+    ? (activeDataset.quality_providers?.[selectedMetaId] ?? [])
+    : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -312,7 +321,7 @@ export default function GraphView({
       </div>
 
       {/* Canvas */}
-      <div className="flex-1">
+      <div className="flex-1 relative">
         <ReactFlow
           key={currentRoot}
           nodes={rfNodes}
@@ -330,6 +339,41 @@ export default function GraphView({
           <Background variant={BackgroundVariant.Dots} color="#334155" gap={24} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>
+
+        {/* Provider panel — shown when a quality node is selected */}
+        {selectedMetaNode && (
+          <div className="absolute top-3 right-3 w-56 bg-slate-800 border border-slate-600 rounded shadow-xl text-xs text-slate-300 flex flex-col max-h-[70%]">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 shrink-0">
+              <span className="font-semibold text-purple-300">{selectedMetaNode.display_name}</span>
+              <button
+                onClick={() => setSelectedMetaId(null)}
+                className="text-slate-500 hover:text-slate-200 transition-colors ml-2"
+              >✕</button>
+            </div>
+            {providerIds.length === 0 ? (
+              <p className="px-3 py-2 text-slate-500">No provider data available.</p>
+            ) : (
+              <>
+                <p className="px-3 pt-2 pb-1 text-slate-500 shrink-0">Items providing this quality:</p>
+                <ul className="overflow-y-auto px-3 pb-2 space-y-0.5">
+                  {providerIds.map((id) => {
+                    const n = activeDataset.nodes[id];
+                    return (
+                      <li key={id}>
+                        <button
+                          onClick={() => { setSelectedMetaId(null); navigateTo(id); }}
+                          className="text-left w-full text-blue-300 hover:text-blue-100 hover:underline truncate block"
+                        >
+                          {n?.display_name ?? id}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
