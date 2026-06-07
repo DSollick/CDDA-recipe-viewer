@@ -194,6 +194,13 @@ def build(resolved: "ResolvedData") -> Graph:
         inlined = _inline_using(prac, resolved.requirements)
         edges.extend(_craft_edges(prac_id, prac_id, inlined, True, nodes, resolved))
 
+    # --- Reclassify virtual tool stubs ---
+    # Incomplete item stubs that are ONLY ever used as non-consumed tool requirements
+    # (qty=-1) are CDDA pseudo-items like surface_heat / fire that have a type our
+    # loader skips (e.g. "TOOL" in legacy data). Treat them as group nodes so they
+    # render as green virtual-requirement nodes instead of blue incomplete item stubs.
+    _reclassify_virtual_tool_nodes(nodes, edges)
+
     # --- Quality providers ---
     # Scan all items for their "qualities" field and build a reverse map:
     # qual_node_id → sorted list of item IDs that provide that quality at that level or higher.
@@ -492,6 +499,34 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
         result["qualities"] = list(result.get("qualities") or []) + extra_qualities
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Post-processing helpers
+# ---------------------------------------------------------------------------
+
+def _reclassify_virtual_tool_nodes(nodes: dict[str, Node], edges: list[Edge]) -> None:
+    """
+    Incomplete stubs that appear ONLY as non-consumed tool requirements (qty=-1)
+    are virtual CDDA pseudo-items (surface_heat, fire, etc.) whose type our loader
+    skips because they use legacy CDDA type strings like "TOOL".  Re-type them as
+    "group" so they render as green virtual-requirement nodes.
+    """
+    # Collect all quantities at which each node is referenced as a component
+    qty_by_node: dict[str, set[int]] = {}
+    for edge in edges:
+        if edge.type == "requires_component":
+            qty_by_node.setdefault(edge.to_node, set()).add(edge.quantity)
+
+    for node_id, qtys in qty_by_node.items():
+        node = nodes.get(node_id)
+        if node and node.incomplete and qtys == {-1}:
+            # Exclusively a non-consumed tool — virtual requirement
+            node.type = "group"
+            # Stub display_name is the raw id; make it human-readable
+            node.display_name = node_id.replace("_", " ").title()
+            node.incomplete = False
+            log.info("Reclassified virtual tool stub %r as group node", node_id)
 
 
 # ---------------------------------------------------------------------------
