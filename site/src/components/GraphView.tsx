@@ -20,7 +20,13 @@ import { Dataset, GraphIndex, GraphNode } from '../types';
 
 const ITEM_W = 164, ITEM_H = 42;
 const META_W = 152, META_H = 34;
-const META_GAP = 60;      // horizontal gap between rightmost parent and meta node
+const DAGRE_RANKSEP = 60; // must match g.setGraph({ ranksep })
+// Meta nodes must clear the next item rank entirely.
+// Next item rank's left edge = parentRight + DAGRE_RANKSEP + ITEM_W/2 - ITEM_W/2 ... actually:
+// parentRight = parentCenter + ITEM_W/2; next rank center = parentCenter + (ITEM_W + DAGRE_RANKSEP);
+// next rank left = parentCenter + DAGRE_RANKSEP + ITEM_W/2 = parentRight + DAGRE_RANKSEP.
+// So META_GAP must be > ITEM_W + DAGRE_RANKSEP to clear the next rank's right edge.
+const META_GAP = ITEM_W + DAGRE_RANKSEP + 24;
 const META_SPACING = 10;  // minimum vertical gap between meta nodes in the same column
 
 function isMeta(type: string) {
@@ -169,7 +175,7 @@ function buildLayoutedGraph(
   // ── Phase 1: Dagre layout for item nodes only ──────────────────────────────
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 60, marginx: 24, marginy: 24 });
+  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: DAGRE_RANKSEP, marginx: 24, marginy: 24 });
 
   for (const id of itemIds) {
     const type = getNode(id).type;
