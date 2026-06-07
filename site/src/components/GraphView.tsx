@@ -167,8 +167,15 @@ function buildLayoutedGraph(
     const type = getNode(id).type;
     g.setNode(id, { width: nodeW(type), height: nodeH(type) });
   }
-  for (const { source, target, isTreeEdge } of collected) {
-    if (isTreeEdge) g.setEdge(source, target);
+  // Add ALL edges (not just spanning-tree edges) so dagre correctly ranks shared nodes.
+  // Deduplicate to avoid parallel edges which confuse dagre's rank assignment.
+  const dagreEdgeSeen = new Set<string>();
+  for (const { source, target } of collected) {
+    const key = `${source}\x00${target}`;
+    if (!dagreEdgeSeen.has(key)) {
+      dagreEdgeSeen.add(key);
+      g.setEdge(source, target);
+    }
   }
 
   dagre.layout(g);
