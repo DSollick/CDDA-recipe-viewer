@@ -126,6 +126,7 @@ def build(resolved: "ResolvedData") -> Graph:
     # (CDDA pseudo-items like surface_heat are defined as both an item and a group)
     for item_id, item in resolved.items.items():
         if item_id in resolved.item_groups:
+            log.info("Item %r is also an item_group — seeding as group node", item_id)
             _ensure_group_node(item_id, resolved.item_groups, nodes)
         else:
             nodes[item_id] = _make_item_node(item_id, item)
