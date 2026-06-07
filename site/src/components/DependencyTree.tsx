@@ -17,6 +17,7 @@ const TYPE_DOT: Record<string, string> = {
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
+  group: 'bg-green-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
