@@ -57,6 +57,7 @@ function CddaNode({ data }: NodeProps) {
   return (
     <div
       style={{ width: nodeW(gn.type), height: nodeH(gn.type) }}
+      title={gn.id}
       className={`flex items-center gap-1.5 px-2 rounded border text-xs select-none
         ${isRoot
           ? 'bg-slate-700 border-slate-400 font-semibold text-white'
