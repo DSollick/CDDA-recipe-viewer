@@ -10,6 +10,7 @@ const TYPE_COLORS: Record<GraphNode['type'], string> = {
   quality: 'bg-purple-800 text-purple-200',
   skill: 'bg-orange-800 text-orange-200',
   proficiency: 'bg-orange-900 text-orange-200',
+  group: 'bg-cyan-800 text-cyan-200',
   construction: 'bg-teal-800 text-teal-200',
   disassembly: 'bg-teal-800 text-teal-200',
   practice: 'bg-teal-800 text-teal-200',

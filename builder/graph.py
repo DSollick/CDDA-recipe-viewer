@@ -67,7 +67,7 @@ log = logging.getLogger(__name__)
 @dataclasses.dataclass
 class Node:
     id: str
-    type: str                                           # item | construction | disassembly | practice | quality | skill | proficiency
+    type: str                                           # item | construction | disassembly | practice | quality | skill | proficiency | group
     display_name: str
     era: str | None = None                             # filled by eras.py
     learn_method: str | None = None                    # autolearn | book | practice | construction | None
@@ -110,6 +110,7 @@ class Graph:
     nodes: dict[str, Node]
     edges: list[Edge]
     quality_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    group_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +161,7 @@ def build(resolved: "ResolvedData") -> Graph:
         if not result:
             continue
         node_id = f"uncraft_{result}"
-        _ensure_item_node(result, resolved.items, nodes)
+        _ensure_item_node(result, resolved.items, nodes, item_groups=resolved.item_groups)
         nodes[node_id] = Node(
             id=node_id,
             type="disassembly",
@@ -170,7 +171,7 @@ def build(resolved: "ResolvedData") -> Graph:
         for slot in unc.get("components", []):
             for alt_idx, entry in enumerate(slot):
                 item_id, qty = entry[0], entry[1]
-                _ensure_item_node(item_id, resolved.items, nodes)
+                _ensure_item_node(item_id, resolved.items, nodes, item_groups=resolved.item_groups)
                 edges.append(Edge(
                     from_node=node_id, to_node=item_id,
                     type="byproduct_of",
@@ -220,7 +221,18 @@ def build(resolved: "ResolvedData") -> Graph:
         if providers:
             quality_providers[node_id] = sorted(set(providers))
 
-    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers)
+    # --- Group providers ---
+    group_providers: dict[str, list[str]] = {}
+    for node_id, node in nodes.items():
+        if node.type != "group":
+            continue
+        members = _flatten_group_members(node_id, resolved.item_groups)
+        # Only include members that exist as actual items (skip nested groups / unknowns)
+        known = [m for m in members if m in resolved.items]
+        if known:
+            group_providers[node_id] = known
+
+    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers, group_providers=group_providers)
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +316,7 @@ def _craft_edges(
     for slot in recipe.get("components", []):
         for alt_idx, entry in enumerate(slot):
             item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key)
+            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
             edges.append(Edge(
                 from_node=from_node, to_node=item_id,
                 type="requires_component",
@@ -319,7 +331,7 @@ def _craft_edges(
     for slot in recipe.get("tools", []):
         for alt_idx, entry in enumerate(slot):
             item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key)
+            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
             edges.append(Edge(
                 from_node=from_node, to_node=item_id,
                 type="requires_component",
@@ -478,15 +490,74 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
 # Node-ensure helpers
 # ---------------------------------------------------------------------------
 
-def _ensure_item_node(item_id: str, items: dict, nodes: dict[str, Node], *, source: str = "") -> None:
+def _ensure_item_node(
+    item_id: str,
+    items: dict,
+    nodes: dict[str, Node],
+    *,
+    source: str = "",
+    item_groups: dict | None = None,
+) -> None:
     if item_id not in nodes:
         item = items.get(item_id)
         if item:
             nodes[item_id] = _make_item_node(item_id, item)
+        elif item_groups and item_id in item_groups:
+            _ensure_group_node(item_id, item_groups, nodes)
         else:
             log.warning("Unknown item %r referenced as component%s — created incomplete stub",
                         item_id, f" in recipe {source!r}" if source else "")
             nodes[item_id] = Node(id=item_id, type="item", display_name=item_id, incomplete=True)
+
+
+def _ensure_group_node(group_id: str, item_groups: dict, nodes: dict[str, Node]) -> None:
+    if group_id not in nodes:
+        g = item_groups.get(group_id, {})
+        display = _display_name(g) if g.get("name") else group_id
+        nodes[group_id] = Node(id=group_id, type="group", display_name=display)
+
+
+def _flatten_group_members(group_id: str, item_groups: dict, _seen: set | None = None) -> list[str]:
+    """Return a flat deduplicated list of item IDs that are direct members of this group.
+
+    CDDA item groups use three formats for their member list:
+      "items"   — [[id, weight], ...] or [{"item": id, ...}, ...]
+      "entries" — [{"item": id}, {"group": other_id}, ...]
+    Nested group references are recursively expanded (cycle-safe).
+    """
+    if _seen is None:
+        _seen = set()
+    if group_id in _seen:
+        return []
+    _seen.add(group_id)
+
+    g = item_groups.get(group_id, {})
+    members: list[str] = []
+
+    def _handle_entry(entry: object) -> None:
+        if isinstance(entry, (list, tuple)) and entry:
+            # [id, weight] or [id, weight, ...] form
+            members.append(str(entry[0]))
+        elif isinstance(entry, dict):
+            if "item" in entry:
+                members.append(str(entry["item"]))
+            elif "group" in entry:
+                members.extend(_flatten_group_members(str(entry["group"]), item_groups, _seen))
+            elif "distribution" in entry or "collection" in entry:
+                sub = entry.get("distribution") or entry.get("collection") or []
+                for e in sub:
+                    _handle_entry(e)
+
+    for entry in g.get("items", []):
+        _handle_entry(entry)
+    for entry in g.get("entries", []):
+        _handle_entry(entry)
+    for entry in g.get("distribution", []):
+        _handle_entry(entry)
+    for entry in g.get("collection", []):
+        _handle_entry(entry)
+
+    return list(dict.fromkeys(members))  # deduplicate, preserve order
 
 
 def _ensure_quality_node(

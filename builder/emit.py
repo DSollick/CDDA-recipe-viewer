@@ -76,6 +76,7 @@ def _dataset(graph: "Graph") -> dict:
         "eras": _build_era_buckets(graph),
         "bottlenecks": bottlenecks,
         "quality_providers": graph.quality_providers,
+        "group_providers": graph.group_providers,
     }
 
 
