@@ -122,12 +122,15 @@ def build(resolved: "ResolvedData") -> Graph:
     nodes: dict[str, Node] = {}
     edges: list[Edge] = []
 
-    # Seed item nodes — if an item ID also exists as an item_group, the group wins
-    # (CDDA pseudo-items like surface_heat are defined as both an item and a group)
+    # Seed item nodes.
+    # Priority order: item_group > PSEUDO item > regular item.
+    # CDDA uses both item_groups and PSEUDO-flagged items as virtual requirements
+    # (surface_heat, fire, etc.) that are never directly crafted or carried.
     for item_id, item in resolved.items.items():
         if item_id in resolved.item_groups:
-            log.info("Item %r is also an item_group — seeding as group node", item_id)
             _ensure_group_node(item_id, resolved.item_groups, nodes)
+        elif "PSEUDO" in item.get("flags", []):
+            nodes[item_id] = Node(id=item_id, type="group", display_name=_display_name(item))
         else:
             nodes[item_id] = _make_item_node(item_id, item)
 
