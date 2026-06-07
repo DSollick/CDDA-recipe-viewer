@@ -496,7 +496,8 @@ def _ensure_quality_node(
 ) -> None:
     if node_id not in nodes:
         tq = tool_qualities.get(qual_id, {})
-        display = _display_name(tq) if tq else f"{qual_id} {level}"
+        base = _display_name(tq) if tq else qual_id
+        display = f"{base} {level}"
         nodes[node_id] = Node(id=node_id, type="quality", display_name=display)
 
 
