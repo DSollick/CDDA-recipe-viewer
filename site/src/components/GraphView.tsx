@@ -92,21 +92,17 @@ function buildLayoutedGraph(
 ): { rfNodes: RFNode[]; rfEdges: RFEdge[] } {
   const { nodes } = dataset;
 
-  // Synthetic level-specific skill nodes built at render time
+  // Synthetic level-specific nodes (skills and tool qualities) built at render time
   const syntheticNodes = new Map<string, GraphNode>();
 
-  function skillLevelId(baseId: string, level: number): string {
-    return level > 0 ? `${baseId}_lvl_${level}` : baseId;
-  }
-
-  function ensureSkillLevelNode(baseId: string, level: number): string {
-    const id = skillLevelId(baseId, level);
+  function ensureLevelNode(baseId: string, level: number, fallbackType: GraphNode['type']): string {
+    const id = level > 0 ? `${baseId}_lvl_${level}` : baseId;
     if (!syntheticNodes.has(id) && !nodes[id]) {
       const base = nodes[baseId];
-      const baseName = base?.display_name ?? baseId.replace('skill_', '');
+      const baseName = base?.display_name ?? baseId.replace(/^(?:skill|quality)_/, '');
       syntheticNodes.set(id, {
         ...(base ?? {
-          id, type: 'skill' as const, era: null, learn_method: null,
+          id, type: fallbackType, era: null, learn_method: null,
           book_sources: [], skill_requirements: [], proficiency_requirements: [],
           craft_time: null, bottleneck_score: 0, spawn_class: null,
           incomplete: false, pseudo: false,
@@ -144,8 +140,10 @@ function buildLayoutedGraph(
 
       const target =
         edge.type === 'requires_skill'
-          ? ensureSkillLevelNode(edge.to, edge.quality_level ?? 0)
-          : edge.to;
+          ? ensureLevelNode(edge.to, edge.quality_level ?? 0, 'skill')
+          : edge.type === 'requires_tool_quality'
+            ? ensureLevelNode(edge.to, edge.quality_level ?? 0, 'quality')
+            : edge.to;
 
       const isTreeEdge = !seen.has(target);
       collected.push({ source: item.id, target, edge, isTreeEdge });
