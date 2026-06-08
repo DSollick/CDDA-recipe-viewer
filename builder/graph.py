@@ -299,6 +299,7 @@ def _make_construction_node(con_id: str, con: dict) -> Node:
         {"skill": s, "level": lvl}
         for s, lvl in con.get("required_skills", [])
     ]
+    desc = _description_text(con) or con.get("pre_note") or None
     return Node(
         id=con_id,
         type="construction",
@@ -306,6 +307,7 @@ def _make_construction_node(con_id: str, con: dict) -> Node:
         learn_method="construction",
         skill_requirements=skill_reqs,
         craft_time=con.get("time"),
+        description=desc,
     )
 
 
@@ -319,6 +321,7 @@ def _make_practice_node(prac_id: str, prac: dict) -> Node:
         learn_method="practice",
         skill_requirements=skill_reqs,
         craft_time=prac.get("time"),
+        description=_description_text(prac),
     )
 
 
@@ -332,6 +335,9 @@ def _populate_node_from_recipe(node: Node, recipe: dict) -> None:
         if isinstance(p, dict) and p.get("required", False)
     ]
     node.craft_time = recipe.get("time")
+    # Use recipe description as fallback when the item has no description of its own
+    if not node.description:
+        node.description = _description_text(recipe)
     # Having a recipe means the item is defined well enough to present; clear stub flag.
     node.incomplete = False
 
