@@ -3,6 +3,9 @@ import { GraphNode } from '../types';
 
 interface NodeDetailProps {
   node: GraphNode;
+  providers?: string[];
+  nodes?: Record<string, GraphNode>;
+  onSelectItem?: (id: string) => void;
 }
 
 const TYPE_COLORS: Record<GraphNode['type'], string> = {
@@ -26,7 +29,7 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
   return <span className={`inline-block text-xs rounded px-2 py-0.5 ${className}`}>{children}</span>;
 }
 
-export default function NodeDetail({ node }: NodeDetailProps) {
+export default function NodeDetail({ node, providers, nodes, onSelectItem }: NodeDetailProps) {
   const typeColor = TYPE_COLORS[node.type] ?? 'bg-slate-700 text-slate-300';
   const learnColor = node.learn_method
     ? (LEARN_METHOD_COLORS[node.learn_method] ?? 'bg-slate-700 text-slate-300')
@@ -119,6 +122,31 @@ export default function NodeDetail({ node }: NodeDetailProps) {
       {node.spawn_class && (
         <DetailRow label="Spawn class">
           <span className="text-slate-300 font-mono text-sm">{node.spawn_class}</span>
+        </DetailRow>
+      )}
+
+      {/* Providers — for group and quality nodes */}
+      {providers && providers.length > 0 && (
+        <DetailRow label={node.type === 'group' ? 'Items that satisfy this' : 'Items providing this'}>
+          <ul className="space-y-0.5 max-h-64 overflow-y-auto">
+            {providers.map((id) => {
+              const n = nodes?.[id];
+              return (
+                <li key={id}>
+                  {onSelectItem ? (
+                    <button
+                      onClick={() => onSelectItem(id)}
+                      className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                    >
+                      {n?.display_name ?? id}
+                    </button>
+                  ) : (
+                    <span className="text-slate-300 text-sm">{n?.display_name ?? id}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </DetailRow>
       )}
     </div>

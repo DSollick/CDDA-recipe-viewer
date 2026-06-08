@@ -222,7 +222,15 @@ export default function App() {
               {/* Detail panel — right 40% */}
               <div className="w-2/5 overflow-auto p-4">
                 {panelNodeId && activeDataset.nodes[panelNodeId] ? (
-                  <NodeDetail node={activeDataset.nodes[panelNodeId]} />
+                  <NodeDetail
+                    node={activeDataset.nodes[panelNodeId]}
+                    providers={
+                      activeDataset.group_providers?.[panelNodeId] ??
+                      activeDataset.quality_providers?.[panelNodeId]
+                    }
+                    nodes={activeDataset.nodes}
+                    onSelectItem={handleSelectItem}
+                  />
                 ) : (
                   <div className="text-slate-500 text-sm mt-4">
                     Click or hover a node in the tree to see details.

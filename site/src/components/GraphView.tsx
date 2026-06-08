@@ -201,7 +201,7 @@ function buildLayoutedGraph(
     source,
     target,
     label: edge.quantity > 1 ? `${edge.quantity}×` : undefined,
-    style: { stroke: EDGE_STROKE[edge.type] ?? '#64748b', strokeWidth: 1.5 },
+    style: { stroke: getNode(target).type === 'group' ? '#4ade80' : (EDGE_STROKE[edge.type] ?? '#64748b'), strokeWidth: 1.5 },
     labelStyle: { fill: '#94a3b8', fontSize: 10 },
     labelBgStyle: { fill: '#1e293b', fillOpacity: 0.8 },
     data: { isTreeEdge },

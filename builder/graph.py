@@ -504,7 +504,7 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
 # ---------------------------------------------------------------------------
 
 def _resolve_dep_target(
-    entry: list,
+    entry: "str | list",
     nodes: dict[str, Node],
     resolved: "ResolvedData",
     recipe_key: str,
@@ -513,14 +513,23 @@ def _resolve_dep_target(
     Resolve a single component/tool entry to (target_node_id, quantity), creating
     the appropriate node.
 
-    An entry is ``[id, qty]`` or ``[id, qty, qualifier]``.  When the qualifier is
-    ``"LIST"`` the id refers to a CDDA *requirement* object (e.g. ``surface_heat``,
-    ``adhesive``, ``any_butter``) — a virtual group of interchangeable items/tools,
-    not a concrete item.  These become green ``group`` nodes; everything else is a
-    normal item node.
+    CDDA uses several formats for entries:
+      "item_id"              — bare string (practice tools list alternatives)
+      ["item_id"]            — single-element list (no qty, assume -1 not consumed)
+      ["item_id", qty]       — standard form
+      ["item_id", qty, "LIST"] — LIST qualifier: id is a requirement object, not an item
+
+    When the qualifier is ``"LIST"`` the id refers to a CDDA *requirement* object
+    (e.g. ``surface_heat``, ``adhesive``) — rendered as a green ``group`` node.
     """
-    dep_id, qty = entry[0], entry[1]
-    is_list = len(entry) >= 3 and entry[2] == "LIST"
+    if isinstance(entry, str):
+        dep_id, qty = entry, -1
+    elif len(entry) < 2:
+        dep_id, qty = entry[0], -1
+    else:
+        dep_id, qty = entry[0], entry[1]
+
+    is_list = isinstance(entry, list) and len(entry) >= 3 and entry[2] == "LIST"
     if is_list and dep_id in resolved.requirements:
         _ensure_requirement_group_node(dep_id, resolved.requirements, nodes)
     else:
