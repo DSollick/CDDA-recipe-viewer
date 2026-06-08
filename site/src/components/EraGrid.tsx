@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dataset, GraphNode } from '../types';
 
 interface EraGridProps {
   era: string | null;
   activeDataset: Dataset | null;
   nullEraNodeIds: string[];
+  harvestedFrom?: Record<string, string[]>;
   onSelectItem: (nodeId: string) => void;
 }
 
@@ -14,7 +15,15 @@ const LEARN_METHOD_COLORS: Record<string, string> = {
   practice: 'bg-yellow-800 text-yellow-200',
 };
 
-export default function EraGrid({ era, activeDataset, nullEraNodeIds, onSelectItem }: EraGridProps) {
+function sourcePriority(node: GraphNode, harvestedFrom?: Record<string, string[]>): number {
+  if (node.learn_method !== null) return 0;
+  if (harvestedFrom?.[node.id]?.length) return 1;
+  return 2;
+}
+
+export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedFrom, onSelectItem }: EraGridProps) {
+  const [preferCraftable, setPreferCraftable] = useState(false);
+
   if (!activeDataset) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
@@ -42,16 +51,35 @@ export default function EraGrid({ era, activeDataset, nullEraNodeIds, onSelectIt
     .map((id) => activeDataset.nodes[id])
     .filter((n): n is GraphNode => n !== undefined && n.type === 'item');
 
-  items.sort((a, b) => a.display_name.localeCompare(b.display_name));
+  items.sort((a, b) => {
+    if (preferCraftable) {
+      const diff = sourcePriority(a, harvestedFrom) - sourcePriority(b, harvestedFrom);
+      if (diff !== 0) return diff;
+    }
+    return a.display_name.localeCompare(b.display_name);
+  });
 
   const eraLabel = era === '__uncategorized__' ? 'Uncategorized' : era;
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <h2 className="text-lg font-semibold text-slate-200 mb-4 capitalize">
-        {eraLabel}
-        <span className="ml-2 text-sm font-normal text-slate-500">{items.length} items</span>
-      </h2>
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-lg font-semibold text-slate-200 capitalize">
+          {eraLabel}
+          <span className="ml-2 text-sm font-normal text-slate-500">{items.length} items</span>
+        </h2>
+        <button
+          onClick={() => setPreferCraftable((v) => !v)}
+          className={`ml-auto text-xs px-2.5 py-1 rounded border transition-colors ${
+            preferCraftable
+              ? 'bg-blue-900 border-blue-600 text-blue-200'
+              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
+          }`}
+          title="Sort craftable items first, then harvestable, then loot-only"
+        >
+          Craftable first
+        </button>
+      </div>
 
       {items.length === 0 ? (
         <div className="text-slate-500 text-sm">No items in this era.</div>

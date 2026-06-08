@@ -226,6 +226,7 @@ export default function App() {
               activeDataset={activeDataset}
               graphIndex={graphIndex}
               onRootChange={(id) => setSelectedItemId(id)}
+              onSwitchToTree={() => setView('tree')}
             />
           )}
 
@@ -240,6 +241,7 @@ export default function App() {
               era={selectedEra}
               activeDataset={activeDataset}
               nullEraNodeIds={nullEraNodeIds}
+              harvestedFrom={activeDataset?.harvested_from}
               onSelectItem={handleSelectItem}
             />
           )}

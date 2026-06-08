@@ -59,16 +59,19 @@ function CddaNode({ data }: NodeProps) {
   const gn = data.graphNode as GraphNode;
   const isRoot = data.isRoot as boolean;
   const harvestedFrom = data.harvestedFrom as Record<string, string[]> | undefined;
+  const hasDeps = data.hasDeps as boolean;
   const meta = isMeta(gn.type);
   const dot = gn.type === 'item'
     ? itemDotColor(gn, harvestedFrom)
     : (DOT_COLOR[gn.type] ?? 'bg-slate-400');
+  const navigable = !isRoot && (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') && hasDeps;
 
   return (
     <div
       style={{ width: nodeW(gn.type), height: nodeH(gn.type) }}
       title={gn.id}
       className={`flex items-center gap-1.5 px-2 rounded border text-xs select-none
+        ${navigable ? 'cursor-pointer' : 'cursor-default'}
         ${isRoot
           ? 'bg-slate-700 border-slate-400 font-semibold text-white'
           : meta
@@ -201,7 +204,12 @@ function buildLayoutedGraph(
       position: pos
         ? { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 }
         : { x: 0, y: 0 },
-      data: { graphNode: getNode(id), isRoot: id === rootId, harvestedFrom: dataset.harvested_from },
+      data: {
+        graphNode: getNode(id),
+        isRoot: id === rootId,
+        harvestedFrom: dataset.harvested_from,
+        hasDeps: (index.outEdges.get(id) ?? []).some((e) => DEP_TYPES.has(e.type)),
+      },
     };
   });
 
@@ -226,6 +234,7 @@ interface GraphViewProps {
   activeDataset: Dataset;
   graphIndex: GraphIndex;
   onRootChange: (id: string) => void;
+  onSwitchToTree: () => void;
 }
 
 export default function GraphView({
@@ -233,6 +242,7 @@ export default function GraphView({
   activeDataset,
   graphIndex,
   onRootChange,
+  onSwitchToTree,
 }: GraphViewProps) {
   const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
@@ -273,13 +283,20 @@ export default function GraphView({
   const currentNode = activeDataset.nodes[currentRoot];
 
   const handleNodeClick: NodeMouseHandler = (_evt, node) => {
+    const gn = node.data.graphNode as GraphNode;
+    if (gn.type === 'quality' || gn.type === 'group') {
+      setSelectedMetaId((prev) => (prev === node.id ? null : node.id));
+    } else {
+      setSelectedMetaId(null);
+    }
+  };
+
+  const handleNodeDoubleClick: NodeMouseHandler = (_evt, node) => {
     if (node.id === currentRoot) return;
     const gn = node.data.graphNode as GraphNode;
     if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
-      setSelectedMetaId(null);
+      if (!node.data.hasDeps) return;
       navigateTo(node.id);
-    } else if (gn.type === 'quality' || gn.type === 'group') {
-      setSelectedMetaId((prev) => (prev === node.id ? null : node.id));
     }
   };
 
@@ -294,6 +311,14 @@ export default function GraphView({
     <div className="flex flex-col h-full">
       {/* Controls */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+        <button
+          onClick={onSwitchToTree}
+          className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
+          title="Back to Browse view"
+        >Browse</button>
+
+        <div className="w-px h-4 bg-slate-700" />
+
         <button
           onClick={() => setHistIdx((i) => i - 1)}
           disabled={!canBack}
@@ -346,6 +371,7 @@ export default function GraphView({
           edges={rfEdges}
           nodeTypes={NODE_TYPES}
           onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           fitView
           fitViewOptions={{ padding: 0.12 }}
           colorMode="dark"
