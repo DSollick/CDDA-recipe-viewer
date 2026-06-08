@@ -318,6 +318,7 @@ export default function App() {
                     nodes={activeDataset.nodes}
                     onSelectItem={handleSelectItem}
                     harvestedFrom={activeDataset.harvested_from?.[panelNodeId]}
+                    foragedFrom={activeDataset.foraged_from?.[panelNodeId]}
                   />
                 ) : (
                   <div className="text-slate-500 text-sm mt-4">

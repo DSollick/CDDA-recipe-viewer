@@ -42,6 +42,7 @@ const DOT_COLOR: Record<string, string> = {
 function itemDotColor(gn: GraphNode, harvestedFrom?: Record<string, string[]>): string {
   if (gn.incomplete) return 'bg-slate-600';
   if (gn.learn_method !== null) return 'bg-blue-400';
+  if (gn.spawn_class === 'environment_gather') return 'bg-green-400';
   if (harvestedFrom?.[gn.id]?.length) return 'bg-amber-400';
   return 'bg-slate-400';
 }

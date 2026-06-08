@@ -67,6 +67,8 @@ class ResolvedData:
     item_groups: dict[str, dict]
     harvests: dict[str, dict]
     monsters: dict[str, dict]
+    terrains: dict[str, dict]        # raw terrain objects (only id/name/harvest_by_season used)
+    furnitures: dict[str, dict]      # raw furniture objects (only id/name/harvest_by_season used)
     blacklists: list[dict]
     innawood_additions: dict[str, list[dict]]
     unresolved_count: int            # copy-from targets that could not be found
@@ -123,6 +125,12 @@ def resolve(data: "LoadedData") -> ResolvedData:
         item_groups=ig_res,
         harvests=harv_res,
         monsters=mon_res,
+        # Terrain/furniture are passed through without copy-from resolution:
+        # we only consume objects that *directly* carry harvest_by_season, so
+        # the small number of inherited cases (mostly _harvested tree variants)
+        # are intentionally skipped.
+        terrains=data.terrains,
+        furnitures=data.furnitures,
         blacklists=data.blacklists,
         innawood_additions=data.innawood_additions,
         unresolved_count=total_unresolved,

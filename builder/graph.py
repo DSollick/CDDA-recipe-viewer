@@ -114,6 +114,7 @@ class Graph:
     quality_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     group_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     harvested_from: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    foraged_from: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -274,8 +275,45 @@ def build(resolved: "ResolvedData") -> Graph:
     for bucket in harvested_from.values():
         bucket.sort()
 
+    # --- Foraged-from index ---
+    # Maps item_id → deduplicated sorted list of terrain/furniture display names
+    # that yield it via harvest_by_season interactions.
+    foraged_from: dict[str, list[str]] = {}
+    all_terrain_furn: dict[str, dict] = {**resolved.terrains, **resolved.furnitures}
+    terrain_sources = list(resolved.terrains.values()) + list(resolved.furnitures.values())
+    for source in terrain_sources:
+        for season_entry in source.get("harvest_by_season", []):
+            table_id = season_entry.get("id")
+            if not table_id:
+                continue
+            table = resolved.harvests.get(table_id)
+            if not table:
+                continue
+            # Resolve display name: fall back one level of copy-from when name is null
+            if source.get("name") is None and source.get("copy-from"):
+                parent = all_terrain_furn.get(source["copy-from"])
+                source_name = _display_name(parent) if parent else _display_name(source)
+            else:
+                source_name = _display_name(source)
+            for entry in table.get("entries", []):
+                if not isinstance(entry, dict):
+                    continue
+                drop = entry.get("drop")
+                if drop and isinstance(drop, str):
+                    bucket = foraged_from.setdefault(drop, [])
+                    if source_name not in bucket:
+                        bucket.append(source_name)
+    for bucket in foraged_from.values():
+        bucket.sort()
+
+    # Tag forageable items that have no recipe as environment_gather
+    for item_id, node in nodes.items():
+        if item_id in foraged_from and node.learn_method is None:
+            node.spawn_class = "environment_gather"
+
     return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers,
-                 group_providers=group_providers, harvested_from=harvested_from)
+                 group_providers=group_providers, harvested_from=harvested_from,
+                 foraged_from=foraged_from)
 
 
 # ---------------------------------------------------------------------------

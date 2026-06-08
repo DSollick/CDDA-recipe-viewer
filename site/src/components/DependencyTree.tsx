@@ -28,9 +28,10 @@ const TYPE_DOT: Record<string, string> = {
 
 function itemDotColor(node: GraphNode, harvestedFrom?: Record<string, string[]>): string {
   if (node.incomplete) return 'bg-slate-600';
-  if (node.learn_method !== null) return 'bg-blue-400';       // craftable
-  if (harvestedFrom?.[node.id]?.length) return 'bg-amber-400'; // harvestable
-  return 'bg-slate-400';                                       // loot-only
+  if (node.learn_method !== null) return 'bg-blue-400';              // craftable
+  if (node.spawn_class === 'environment_gather') return 'bg-green-400'; // forageable
+  if (harvestedFrom?.[node.id]?.length) return 'bg-amber-400';      // harvestable from monsters
+  return 'bg-slate-400';                                             // loot-only
 }
 
 const EDGE_TYPE_LABEL: Record<GraphEdge['type'], string> = {
