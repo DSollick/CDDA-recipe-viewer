@@ -228,6 +228,7 @@ export default function App() {
               rootNodeId={selectedItemId}
               activeDataset={activeDataset}
               graphIndex={graphIndex}
+              preferCraftable={preferCraftable}
               onRootChange={(id) => setSelectedItemId(id)}
             />
           )}

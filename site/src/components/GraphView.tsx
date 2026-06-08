@@ -103,6 +103,7 @@ function buildLayoutedGraph(
   index: GraphIndex,
   maxHops: number,
   showMeta: boolean,
+  preferCraftable: boolean,
 ): { rfNodes: RFNode[]; rfEdges: RFEdge[] } {
   const { nodes } = dataset;
 
@@ -147,10 +148,38 @@ function buildLayoutedGraph(
     const item = queue.shift()!;
     if (item.depth >= maxHops) continue;
 
-    for (const edge of index.outEdges.get(item.id) ?? []) {
+    const allOut = index.outEdges.get(item.id) ?? [];
+
+    // Build a map of slot key → best edge for component slots.
+    // When preferCraftable, prefer the edge whose target has a known recipe.
+    const slotBest = new Map<string, typeof allOut[0]>();
+    for (const edge of allOut) {
+      if (edge.type !== 'requires_component') continue;
+      const slotKey = `${edge.recipe_key ?? ''}:${edge.slot_index ?? ''}`;
+      const existing = slotBest.get(slotKey);
+      if (!existing) {
+        slotBest.set(slotKey, edge);
+      } else if (preferCraftable) {
+        const curCraftable = nodes[edge.to]?.learn_method !== null && nodes[edge.to]?.learn_method !== undefined;
+        const prevCraftable = nodes[existing.to]?.learn_method !== null && nodes[existing.to]?.learn_method !== undefined;
+        if (curCraftable && !prevCraftable) slotBest.set(slotKey, edge);
+      } else if (edge.is_default) {
+        slotBest.set(slotKey, edge);
+      }
+    }
+
+    for (const edge of allOut) {
       if (!DEP_TYPES.has(edge.type)) continue;
-      if (!edge.is_default) continue;
       if (!showMeta && edge.type !== 'requires_component') continue;
+
+      // For component slots, show only the best-chosen alternative (craftable or default).
+      if (edge.type === 'requires_component') {
+        const slotKey = `${edge.recipe_key ?? ''}:${edge.slot_index ?? ''}`;
+        if (slotBest.get(slotKey) !== edge) continue;
+      } else {
+        // Non-component edges (skills, qualities, proficiencies): keep is_default filter.
+        if (!edge.is_default) continue;
+      }
 
       // Skill nodes have no level in their ID — create a synthetic level-specific node.
       // Quality nodes already encode the level in their ID (qual_CUT_2), so use edge.to directly.
@@ -233,6 +262,7 @@ interface GraphViewProps {
   rootNodeId: string;
   activeDataset: Dataset;
   graphIndex: GraphIndex;
+  preferCraftable?: boolean;
   onRootChange: (id: string) => void;
 }
 
@@ -240,6 +270,7 @@ export default function GraphView({
   rootNodeId,
   activeDataset,
   graphIndex,
+  preferCraftable = false,
   onRootChange,
 }: GraphViewProps) {
   const [maxHops, setMaxHops] = useState(3);
@@ -274,8 +305,8 @@ export default function GraphView({
   }
 
   const { rfNodes, rfEdges } = useMemo(
-    () => buildLayoutedGraph(currentRoot, activeDataset, graphIndex, maxHops, showMeta),
-    [currentRoot, activeDataset, graphIndex, maxHops, showMeta],
+    () => buildLayoutedGraph(currentRoot, activeDataset, graphIndex, maxHops, showMeta, preferCraftable),
+    [currentRoot, activeDataset, graphIndex, maxHops, showMeta, preferCraftable],
   );
 
   const currentNode = activeDataset.nodes[currentRoot];
