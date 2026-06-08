@@ -12,6 +12,7 @@ export interface GraphNode {
   spawn_class: string | null;
   incomplete: boolean;
   pseudo: boolean;
+  description?: string | null;
 }
 
 export interface GraphEdge {
@@ -37,6 +38,7 @@ export interface Dataset {
   bottlenecks: string[]; // top-20 node IDs by bottleneck_score
   quality_providers: Record<string, string[]>; // qual_node_id → item IDs that satisfy it
   group_providers: Record<string, string[]>;   // group_id → member item IDs
+  harvested_from?: Record<string, string[]>;   // item_id → monster display names
 }
 
 export interface GraphMeta {

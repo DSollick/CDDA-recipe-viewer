@@ -79,6 +79,7 @@ class Node:
     spawn_class: str | None = None                     # filled by spawn.py
     incomplete: bool = False
     pseudo: bool = False
+    description: str | None = None
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -111,6 +112,7 @@ class Graph:
     edges: list[Edge]
     quality_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     group_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    harvested_from: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +249,32 @@ def build(resolved: "ResolvedData") -> Graph:
         if known:
             group_providers[node_id] = known
 
-    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers, group_providers=group_providers)
+    # --- Harvested-from index ---
+    # Maps item_id → deduplicated sorted list of monster display names that drop it
+    harvested_from: dict[str, list[str]] = {}
+    for _mon_id, monster in resolved.monsters.items():
+        harvest_ref = monster.get("harvest")
+        if not harvest_ref:
+            continue
+        table_ids = [harvest_ref] if isinstance(harvest_ref, str) else list(harvest_ref)
+        mon_name = _display_name(monster)
+        for table_id in table_ids:
+            table = resolved.harvests.get(table_id)
+            if not table:
+                continue
+            for entry in table.get("entries", []):
+                if not isinstance(entry, dict):
+                    continue
+                drop = entry.get("drop")
+                if drop and isinstance(drop, str):
+                    bucket = harvested_from.setdefault(drop, [])
+                    if mon_name not in bucket:
+                        bucket.append(mon_name)
+    for bucket in harvested_from.values():
+        bucket.sort()
+
+    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers,
+                 group_providers=group_providers, harvested_from=harvested_from)
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +288,7 @@ def _make_item_node(item_id: str, item: dict) -> Node:
         type="item",
         display_name=_display_name(item),
         pseudo="PSEUDO" in flags,
+        description=_description_text(item),
     )
 
 
@@ -687,6 +715,17 @@ def _ensure_proficiency_node(prof_id: str, node_id: str, nodes: dict[str, Node])
 
 def _quality_node_id(qual_id: str, level: int) -> str:
     return f"qual_{qual_id}_{level}"
+
+
+def _description_text(obj: dict) -> str | None:
+    desc = obj.get("description")
+    if desc is None:
+        return None
+    if isinstance(desc, str):
+        return desc
+    if isinstance(desc, dict):
+        return desc.get("str") or desc.get("str_sp") or None
+    return None
 
 
 def _display_name(obj: dict) -> str:
