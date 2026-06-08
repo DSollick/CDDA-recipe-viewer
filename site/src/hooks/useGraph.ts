@@ -27,7 +27,11 @@ export function useGraph(): UseGraphResult {
     setLoadState('loading');
     setErrorMessage(null);
 
-    fetch(`${import.meta.env.BASE_URL}graph.json`)
+    const sha = import.meta.env.VITE_DEPLOY_SHA;
+    const url = sha
+      ? `${import.meta.env.BASE_URL}graph.json?v=${sha.slice(0, 7)}`
+      : `${import.meta.env.BASE_URL}graph.json`;
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         return res.json() as Promise<GraphData>;
