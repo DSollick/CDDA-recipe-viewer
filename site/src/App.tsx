@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { ViewMode } from './types';
 import { useGraph } from './hooks/useGraph';
 import Header from './components/Header';
@@ -36,21 +36,9 @@ export default function App() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
 
-  // Tree-view navigation history (mirrors GraphView's internal history)
+  // Tree-view navigation history — shared by all item-navigation paths
   const [treeHistory, setTreeHistory] = useState<string[]>([]);
-  const [treeHistIdx, setTreeHistIdx] = useState(0);
-  const suppressTreeReset = useRef(false);
-
-  useEffect(() => {
-    if (suppressTreeReset.current) {
-      suppressTreeReset.current = false;
-      return;
-    }
-    if (selectedItemId) {
-      setTreeHistory([selectedItemId]);
-      setTreeHistIdx(0);
-    }
-  }, [selectedItemId]);
+  const [treeHistIdx, setTreeHistIdx] = useState(-1);
 
   // Ordered list of eras present in current dataset
   const orderedEras = useMemo<string[]>(() => {
@@ -70,29 +58,32 @@ export default function App() {
   // The node shown in the detail panel: hoveredNodeId takes priority, else detailNodeId (selected item)
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
 
-  function handleSelectItem(nodeId: string) {
+  // Single unified navigation function — every path that picks a new item goes here.
+  // This ensures provider links, era grid clicks, and double-clicks in the tree all
+  // append to the same history stack so back/forward always works.
+  function navigateTo(nodeId: string) {
+    if (nodeId === selectedItemId) return;
+    const insertAt = treeHistIdx + 1;
+    setTreeHistory((prev) => [...prev.slice(0, insertAt), nodeId]);
+    setTreeHistIdx(insertAt);
     setSelectedItemId(nodeId);
     setDetailNodeId(nodeId);
     setHoveredNodeId(null);
-    // Stay in graph view if already there, else switch to tree
+  }
+
+  function handleSelectItem(nodeId: string) {
+    navigateTo(nodeId);
     setView((v) => v === 'graph' ? 'graph' : 'tree');
   }
 
-  function navigateTreeTo(id: string) {
-    if (id === selectedItemId) return;
-    setTreeHistory((prev) => [...prev.slice(0, treeHistIdx + 1), id]);
-    setTreeHistIdx((i) => i + 1);
-    suppressTreeReset.current = true;
-    setSelectedItemId(id);
-    setDetailNodeId(id);
-    setHoveredNodeId(null);
+  function navigateTreeTo(nodeId: string) {
+    navigateTo(nodeId);
   }
 
   function treeBack() {
     const newIdx = treeHistIdx - 1;
     const id = treeHistory[newIdx];
     setTreeHistIdx(newIdx);
-    suppressTreeReset.current = true;
     setSelectedItemId(id);
     setDetailNodeId(id);
     setHoveredNodeId(null);
@@ -102,7 +93,6 @@ export default function App() {
     const newIdx = treeHistIdx + 1;
     const id = treeHistory[newIdx];
     setTreeHistIdx(newIdx);
-    suppressTreeReset.current = true;
     setSelectedItemId(id);
     setDetailNodeId(id);
     setHoveredNodeId(null);
@@ -126,12 +116,14 @@ export default function App() {
 
   const hasUncategorized = nullEraNodeIds.length > 0;
 
-  // When dataset changes, reset navigation
+  // When dataset changes, reset all navigation
   function handleSetActiveKey(k: typeof activeKey) {
     setActiveKey(k);
     setSelectedItemId(null);
     setDetailNodeId(null);
     setSelectedEra(null);
+    setTreeHistory([]);
+    setTreeHistIdx(-1);
     setView('era');
   }
 
