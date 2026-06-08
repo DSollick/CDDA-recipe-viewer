@@ -6,15 +6,15 @@ interface DependencyTreeProps {
   rootNodeId: string;
   nodes: Record<string, GraphNode>;
   graphIndex: GraphIndex;
+  harvestedFrom?: Record<string, string[]>;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
   selectedNodeId: string | null;
 }
 
-// Node type dot colors
+// Node type dot colors — items use itemDotColor() instead
 const TYPE_DOT: Record<string, string> = {
-  item: 'bg-blue-400',
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
@@ -23,6 +23,13 @@ const TYPE_DOT: Record<string, string> = {
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
 };
+
+function itemDotColor(node: GraphNode, harvestedFrom?: Record<string, string[]>): string {
+  if (node.incomplete) return 'bg-slate-600';
+  if (node.learn_method !== null) return 'bg-blue-400';       // craftable
+  if (harvestedFrom?.[node.id]?.length) return 'bg-amber-400'; // harvestable
+  return 'bg-slate-400';                                       // loot-only
+}
 
 const EDGE_TYPE_LABEL: Record<GraphEdge['type'], string> = {
   requires_component: '',
@@ -36,6 +43,7 @@ export default function DependencyTree({
   rootNodeId,
   nodes,
   graphIndex,
+  harvestedFrom,
   onHoverNode,
   onClickNode,
   onDoubleClickNode,
@@ -93,6 +101,7 @@ export default function DependencyTree({
         onToggleExpand={toggleExpand}
         onToggleAlt={toggleAlt}
         onSetSlotActive={setSlotActive}
+        harvestedFrom={harvestedFrom}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
         onDoubleClickNode={onDoubleClickNode}
@@ -115,6 +124,7 @@ interface RowProps {
   onToggleExpand: (key: string) => void;
   onToggleAlt: (key: string) => void;
   onSetSlotActive: (key: string, idx: number) => void;
+  harvestedFrom?: Record<string, string[]>;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -131,6 +141,7 @@ function TreeNodeRow({
   expandedPaths,
   slotSelections,
   expandedAlts,
+  harvestedFrom,
   onToggleExpand,
   onToggleAlt,
   onSetSlotActive,
@@ -170,7 +181,11 @@ function TreeNodeRow({
     ).length ?? 0) > 0);
 
   const isSelected = selectedNodeId === treeNode.nodeId;
-  const dotColor = node ? (TYPE_DOT[node.type] ?? 'bg-slate-400') : 'bg-slate-600';
+  const dotColor = !node
+    ? 'bg-slate-600'
+    : node.type === 'item'
+      ? itemDotColor(node, harvestedFrom)
+      : (TYPE_DOT[node.type] ?? 'bg-slate-400');
 
   // Build expanded tree node on demand when user expands a stub
   const expandedNode =
@@ -263,6 +278,7 @@ function TreeNodeRow({
                 onToggleExpand={onToggleExpand}
                 onToggleAlt={onToggleAlt}
                 onSetSlotActive={onSetSlotActive}
+                harvestedFrom={harvestedFrom}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
                 onDoubleClickNode={onDoubleClickNode}
@@ -314,6 +330,7 @@ function TreeNodeRow({
                       onSetSlotActive={onSetSlotActive}
                       onHoverNode={onHoverNode}
                       onClickNode={onClickNode}
+                      harvestedFrom={harvestedFrom}
                       onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}
@@ -362,6 +379,7 @@ function TreeNodeRow({
                             onSetSlotActive={onSetSlotActive}
                             onHoverNode={onHoverNode}
                             onClickNode={onClickNode}
+                            harvestedFrom={harvestedFrom}
                             onDoubleClickNode={onDoubleClickNode}
                             selectedNodeId={selectedNodeId}
                             pathKey={altChildPath}

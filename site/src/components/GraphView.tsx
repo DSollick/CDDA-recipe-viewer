@@ -30,7 +30,6 @@ function nodeH(type: string) { return isMeta(type) ? META_H : ITEM_H; }
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 const DOT_COLOR: Record<string, string> = {
-  item: 'bg-blue-400',
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
@@ -39,6 +38,13 @@ const DOT_COLOR: Record<string, string> = {
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
 };
+
+function itemDotColor(gn: GraphNode, harvestedFrom?: Record<string, string[]>): string {
+  if (gn.incomplete) return 'bg-slate-600';
+  if (gn.learn_method !== null) return 'bg-blue-400';
+  if (harvestedFrom?.[gn.id]?.length) return 'bg-amber-400';
+  return 'bg-slate-400';
+}
 
 const EDGE_STROKE: Record<string, string> = {
   requires_component:    '#64748b',
@@ -52,8 +58,11 @@ const EDGE_STROKE: Record<string, string> = {
 function CddaNode({ data }: NodeProps) {
   const gn = data.graphNode as GraphNode;
   const isRoot = data.isRoot as boolean;
+  const harvestedFrom = data.harvestedFrom as Record<string, string[]> | undefined;
   const meta = isMeta(gn.type);
-  const dot = DOT_COLOR[gn.type] ?? 'bg-slate-400';
+  const dot = gn.type === 'item'
+    ? itemDotColor(gn, harvestedFrom)
+    : (DOT_COLOR[gn.type] ?? 'bg-slate-400');
 
   return (
     <div
@@ -192,7 +201,7 @@ function buildLayoutedGraph(
       position: pos
         ? { x: pos.x - nodeW(type) / 2, y: pos.y - nodeH(type) / 2 }
         : { x: 0, y: 0 },
-      data: { graphNode: getNode(id), isRoot: id === rootId },
+      data: { graphNode: getNode(id), isRoot: id === rootId, harvestedFrom: dataset.harvested_from },
     };
   });
 
