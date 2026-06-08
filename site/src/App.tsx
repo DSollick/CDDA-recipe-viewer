@@ -79,6 +79,7 @@ export default function App() {
   }
 
   function navigateTreeTo(id: string) {
+    if (id === selectedItemId) return;
     setTreeHistory((prev) => [...prev.slice(0, treeHistIdx + 1), id]);
     setTreeHistIdx((i) => i + 1);
     suppressTreeReset.current = true;
