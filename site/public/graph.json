@@ -51,6 +51,36 @@
         "spawn_class": null,
         "incomplete": false
       },
+      "sinew": {
+        "id": "sinew",
+        "type": "item",
+        "display_name": "Sinew",
+        "era": "wood",
+        "learn_method": null,
+        "book_sources": [],
+        "skill_requirements": [],
+        "proficiency_requirements": [],
+        "craft_time": null,
+        "bottleneck_score": 3,
+        "spawn_class": null,
+        "incomplete": false,
+        "description": "Strong fibrous tissue harvested from animal tendons. Useful for binding and fletching."
+      },
+      "pine_bough": {
+        "id": "pine_bough",
+        "type": "item",
+        "display_name": "Pine Bough",
+        "era": "wood",
+        "learn_method": null,
+        "book_sources": [],
+        "skill_requirements": [],
+        "proficiency_requirements": [],
+        "craft_time": null,
+        "bottleneck_score": 0,
+        "spawn_class": "forest",
+        "incomplete": false,
+        "description": "A fragrant branch from a pine tree, useful for bedding or tinder."
+      },
       "rock": {
         "id": "rock",
         "type": "item",
@@ -569,7 +599,7 @@
       }
     ],
     "eras": {
-      "wood": ["log", "stick", "wooden_stake"],
+      "wood": ["log", "sinew", "stick", "wooden_stake", "pine_bough"],
       "stone": ["rock", "flint", "stone_knife"],
       "bone": ["bone", "bone_needle"],
       "leather": ["leather", "thread", "leather_pouch"],
@@ -588,6 +618,12 @@
       "stick",
       "thread",
       "crude_fiber"
-    ]
+    ],
+    "quality_providers": {},
+    "group_providers": {},
+    "harvested_from": {
+      "sinew": ["Black Wolf", "Deer", "Zombie Deer"],
+      "bone": ["Black Wolf", "Deer", "Giant Ant", "Zombie Deer"]
+    }
   }
 }
