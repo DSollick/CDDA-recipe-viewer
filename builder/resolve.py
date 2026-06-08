@@ -289,6 +289,7 @@ def _apply_mod_layer(
     mod_objects: list[dict],
     label: str,
     key_fn: "callable[[dict], str | None]",
+    mod_name: str = "innawood",
 ) -> tuple[dict[str, dict], int]:
     """
     Overlay a list of mod objects onto an already-resolved vanilla bucket.
@@ -305,6 +306,9 @@ def _apply_mod_layer(
         key = key_fn(obj)
         if key is None:
             continue
+
+        # Tag the object with its mod source without mutating the original
+        obj = {**obj, "_mod": mod_name}
 
         parent_id = obj.get("copy-from")
 

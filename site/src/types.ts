@@ -13,6 +13,7 @@ export interface GraphNode {
   incomplete: boolean;
   pseudo: boolean;
   description?: string | null;
+  mod_source?: string | null;
 }
 
 export interface GraphEdge {

@@ -52,6 +52,7 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
+        {node.mod_source && <Badge className="bg-emerald-900 text-emerald-300">{node.mod_source}</Badge>}
         {node.pseudo && <Badge className="bg-violet-900 text-violet-300">pseudo</Badge>}
         {node.incomplete && <Badge className="bg-red-900 text-red-300">incomplete</Badge>}
       </div>

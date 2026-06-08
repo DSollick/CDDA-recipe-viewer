@@ -96,6 +96,9 @@ function CddaNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} />
       <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
       <span className="truncate flex-1 min-w-0">{gn.display_name}</span>
+      {gn.mod_source && (
+        <span className="shrink-0 text-[9px] text-emerald-400 leading-tight">{gn.mod_source}</span>
+      )}
       {altCount > 1 && slotKey && (
         <button
           onPointerDown={(e) => e.stopPropagation()}

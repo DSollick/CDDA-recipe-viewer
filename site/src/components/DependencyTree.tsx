@@ -269,6 +269,11 @@ function TreeNodeRow({
           <span className="text-xs text-slate-500 italic ml-1">(see above)</span>
         )}
 
+        {/* Mod source */}
+        {node?.mod_source && (
+          <span className="text-xs text-emerald-400 ml-1 shrink-0">{node.mod_source}</span>
+        )}
+
         {/* Pseudo / incomplete */}
         {node?.pseudo && (
           <span className="text-xs text-violet-400 ml-1">pseudo</span>

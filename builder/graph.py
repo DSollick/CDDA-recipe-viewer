@@ -80,6 +80,7 @@ class Node:
     incomplete: bool = False
     pseudo: bool = False
     description: str | None = None
+    mod_source: str | None = None                        # e.g. "innawood" | None (vanilla)
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -289,6 +290,7 @@ def _make_item_node(item_id: str, item: dict) -> Node:
         display_name=_display_name(item),
         pseudo="PSEUDO" in flags,
         description=_description_text(item),
+        mod_source=item.get("_mod") or None,
     )
 
 
@@ -308,6 +310,7 @@ def _make_construction_node(con_id: str, con: dict) -> Node:
         skill_requirements=skill_reqs,
         craft_time=con.get("time"),
         description=desc,
+        mod_source=con.get("_mod") or None,
     )
 
 
@@ -322,6 +325,7 @@ def _make_practice_node(prac_id: str, prac: dict) -> Node:
         skill_requirements=skill_reqs,
         craft_time=prac.get("time"),
         description=_description_text(prac),
+        mod_source=prac.get("_mod") or None,
     )
 
 
@@ -340,6 +344,9 @@ def _populate_node_from_recipe(node: Node, recipe: dict) -> None:
         node.description = _description_text(recipe)
     # Having a recipe means the item is defined well enough to present; clear stub flag.
     node.incomplete = False
+    # Prefer recipe mod source over item mod source (recipe is what changed)
+    if recipe.get("_mod"):
+        node.mod_source = recipe["_mod"]
 
 
 # ---------------------------------------------------------------------------
