@@ -6,22 +6,33 @@ interface DependencyTreeProps {
   rootNodeId: string;
   nodes: Record<string, GraphNode>;
   graphIndex: GraphIndex;
+  harvestedFrom?: Record<string, string[]>;
+  preferCraftable?: boolean;
+  expandLevel?: number;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
+  onDoubleClickNode?: (id: string) => void;
   selectedNodeId: string | null;
 }
 
-// Node type dot colors
+// Node type dot colors — items use itemDotColor() instead
 const TYPE_DOT: Record<string, string> = {
-  item: 'bg-blue-400',
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
-  group: 'bg-green-400',
+  group: 'bg-yellow-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
 };
+
+function itemDotColor(node: GraphNode, harvestedFrom?: Record<string, string[]>): string {
+  if (node.incomplete) return 'bg-slate-600';
+  if (node.learn_method !== null) return 'bg-blue-400';              // craftable
+  if (node.spawn_class === 'environment_gather') return 'bg-green-400'; // forageable from terrain
+  if (harvestedFrom?.[node.id]?.length) return 'bg-amber-400';       // harvestable from monsters
+  return 'bg-slate-400';                                             // loot-only
+}
 
 const EDGE_TYPE_LABEL: Record<GraphEdge['type'], string> = {
   requires_component: '',
@@ -35,8 +46,12 @@ export default function DependencyTree({
   rootNodeId,
   nodes,
   graphIndex,
+  harvestedFrom,
+  preferCraftable,
+  expandLevel,
   onHoverNode,
   onClickNode,
+  onDoubleClickNode,
   selectedNodeId,
 }: DependencyTreeProps) {
   // expandedNodes: Set of nodeId+depth keys that are manually expanded beyond default
@@ -45,6 +60,14 @@ export default function DependencyTree({
   const [slotSelections, setSlotSelections] = useState<Map<string, number>>(new Map());
   // expandedAlts: set of "nodeId:slotKey" to show all alternatives
   const [expandedAlts, setExpandedAlts] = useState<Set<string>>(new Set());
+
+  // When expandLevel resets to -1 (collapse all), clear manual expansion state
+  React.useEffect(() => {
+    if ((expandLevel ?? -1) < 0) {
+      setExpandedPaths(new Set());
+      setExpandedAlts(new Set());
+    }
+  }, [expandLevel]);
 
   const rootTree = buildTreeNode(
     rootNodeId,
@@ -91,8 +114,12 @@ export default function DependencyTree({
         onToggleExpand={toggleExpand}
         onToggleAlt={toggleAlt}
         onSetSlotActive={setSlotActive}
+        harvestedFrom={harvestedFrom}
+        preferCraftable={preferCraftable}
+        expandLevel={expandLevel}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
+        onDoubleClickNode={onDoubleClickNode}
         selectedNodeId={selectedNodeId}
         pathKey={rootNodeId}
         ancestorPath={new Set([rootNodeId])}
@@ -112,8 +139,12 @@ interface RowProps {
   onToggleExpand: (key: string) => void;
   onToggleAlt: (key: string) => void;
   onSetSlotActive: (key: string, idx: number) => void;
+  harvestedFrom?: Record<string, string[]>;
+  preferCraftable?: boolean;
+  expandLevel?: number;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
+  onDoubleClickNode?: (id: string) => void;
   selectedNodeId: string | null;
   pathKey: string;
   ancestorPath: Set<string>;
@@ -127,11 +158,15 @@ function TreeNodeRow({
   expandedPaths,
   slotSelections,
   expandedAlts,
+  harvestedFrom,
+  preferCraftable,
+  expandLevel,
   onToggleExpand,
   onToggleAlt,
   onSetSlotActive,
   onHoverNode,
   onClickNode,
+  onDoubleClickNode,
   selectedNodeId,
   pathKey,
   ancestorPath,
@@ -151,7 +186,7 @@ function TreeNodeRow({
   const hasChildren =
     treeNode.nonComponentChildren.length > 0 || treeNode.componentSlots.length > 0;
 
-  const isExpanded = isRoot || expandedPaths.has(pathKey);
+  const isExpanded = isRoot || expandedPaths.has(pathKey) || treeNode.depth <= (expandLevel ?? -1);
 
   // For stubs: check if there are actually edges to expand
   const depEdgesExist =
@@ -165,7 +200,11 @@ function TreeNodeRow({
     ).length ?? 0) > 0);
 
   const isSelected = selectedNodeId === treeNode.nodeId;
-  const dotColor = node ? (TYPE_DOT[node.type] ?? 'bg-slate-400') : 'bg-slate-600';
+  const dotColor = !node
+    ? 'bg-slate-600'
+    : node.type === 'item'
+      ? itemDotColor(node, harvestedFrom)
+      : (TYPE_DOT[node.type] ?? 'bg-slate-400');
 
   // Build expanded tree node on demand when user expands a stub
   const expandedNode =
@@ -184,11 +223,12 @@ function TreeNodeRow({
           isSelected ? 'bg-slate-700' : 'hover:bg-slate-800'
         }`}
         onClick={() => onClickNode(treeNode.nodeId)}
+        onDoubleClick={() => onDoubleClickNode?.(treeNode.nodeId)}
         onMouseEnter={() => onHoverNode(treeNode.nodeId)}
         onMouseLeave={() => onHoverNode(null)}
       >
         {/* Expand toggle — only show if there are (or might be) children */}
-        {(hasChildren || depEdgesExist || isStub) && !treeNode.isCycle ? (
+        {(hasChildren || depEdgesExist) && !treeNode.isCycle ? (
           <button
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
@@ -230,6 +270,11 @@ function TreeNodeRow({
           <span className="text-xs text-slate-500 italic ml-1">(see above)</span>
         )}
 
+        {/* Mod source */}
+        {node?.mod_source && (
+          <span className="text-xs text-emerald-400 ml-1 shrink-0">{node.mod_source}</span>
+        )}
+
         {/* Pseudo / incomplete */}
         {node?.pseudo && (
           <span className="text-xs text-violet-400 ml-1">pseudo</span>
@@ -257,8 +302,12 @@ function TreeNodeRow({
                 onToggleExpand={onToggleExpand}
                 onToggleAlt={onToggleAlt}
                 onSetSlotActive={onSetSlotActive}
+                harvestedFrom={harvestedFrom}
+                preferCraftable={preferCraftable}
+                expandLevel={expandLevel}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
+                onDoubleClickNode={onDoubleClickNode}
                 selectedNodeId={selectedNodeId}
                 pathKey={childPath}
                 ancestorPath={nextAncestors}
@@ -269,7 +318,15 @@ function TreeNodeRow({
           {/* Component slots */}
           {expandedNode.componentSlots.map((slotGroup, si) => {
             const slotKey = `${treeNode.nodeId}:slot:${slotGroup.slot.slotIndex ?? si}`;
-            const activeIdx = slotSelections.get(slotKey) ?? slotGroup.activeEdgeIndex;
+            let defaultIdx = slotGroup.activeEdgeIndex;
+            if (preferCraftable && !slotSelections.has(slotKey) && slotGroup.alternatives.length > 1) {
+              const craftableIdx = slotGroup.alternatives.findIndex((alt) => {
+                const altNode = nodes[alt.nodeId];
+                return altNode?.learn_method !== null && altNode?.learn_method !== undefined;
+              });
+              if (craftableIdx !== -1) defaultIdx = craftableIdx;
+            }
+            const activeIdx = slotSelections.get(slotKey) ?? defaultIdx;
             const activeAlt = slotGroup.alternatives[activeIdx];
             const altKey = `${pathKey}::slot${si}`;
             const showingAlts = expandedAlts.has(altKey);
@@ -307,6 +364,10 @@ function TreeNodeRow({
                       onSetSlotActive={onSetSlotActive}
                       onHoverNode={onHoverNode}
                       onClickNode={onClickNode}
+                      harvestedFrom={harvestedFrom}
+                      preferCraftable={preferCraftable}
+                      expandLevel={expandLevel}
+                      onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}
                       ancestorPath={nextAncestors}
@@ -354,6 +415,9 @@ function TreeNodeRow({
                             onSetSlotActive={onSetSlotActive}
                             onHoverNode={onHoverNode}
                             onClickNode={onClickNode}
+                            harvestedFrom={harvestedFrom}
+                            preferCraftable={preferCraftable}
+                            onDoubleClickNode={onDoubleClickNode}
                             selectedNodeId={selectedNodeId}
                             pathKey={altChildPath}
                             ancestorPath={nextAncestors}

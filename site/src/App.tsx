@@ -32,9 +32,15 @@ export default function App() {
 
   const [view, setView] = useState<ViewMode>('era');
   const [selectedEra, setSelectedEra] = useState<string | null>(null);
+  const [preferCraftable, setPreferCraftable] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+
+  // Tree-view navigation history — shared by all item-navigation paths
+  const [treeHistory, setTreeHistory] = useState<string[]>([]);
+  const [treeHistIdx, setTreeHistIdx] = useState(-1);
+  const [treeExpandLevel, setTreeExpandLevel] = useState(-1);
 
   // Ordered list of eras present in current dataset
   const orderedEras = useMemo<string[]>(() => {
@@ -54,13 +60,49 @@ export default function App() {
   // The node shown in the detail panel: hoveredNodeId takes priority, else detailNodeId (selected item)
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
 
-  function handleSelectItem(nodeId: string) {
+  // Single unified navigation function — every path that picks a new item goes here.
+  // This ensures provider links, era grid clicks, and double-clicks in the tree all
+  // append to the same history stack so back/forward always works.
+  function navigateTo(nodeId: string) {
+    if (nodeId === selectedItemId) return;
+    const insertAt = treeHistIdx + 1;
+    setTreeHistory((prev) => [...prev.slice(0, insertAt), nodeId]);
+    setTreeHistIdx(insertAt);
     setSelectedItemId(nodeId);
     setDetailNodeId(nodeId);
     setHoveredNodeId(null);
-    // Stay in graph view if already there, else switch to tree
+    setTreeExpandLevel(-1);
+  }
+
+  function handleSelectItem(nodeId: string) {
+    navigateTo(nodeId);
     setView((v) => v === 'graph' ? 'graph' : 'tree');
   }
+
+  function navigateTreeTo(nodeId: string) {
+    navigateTo(nodeId);
+  }
+
+  function treeBack() {
+    const newIdx = treeHistIdx - 1;
+    const id = treeHistory[newIdx];
+    setTreeHistIdx(newIdx);
+    setSelectedItemId(id);
+    setDetailNodeId(id);
+    setHoveredNodeId(null);
+  }
+
+  function treeForward() {
+    const newIdx = treeHistIdx + 1;
+    const id = treeHistory[newIdx];
+    setTreeHistIdx(newIdx);
+    setSelectedItemId(id);
+    setDetailNodeId(id);
+    setHoveredNodeId(null);
+  }
+
+  const treeCanBack = treeHistIdx > 0;
+  const treeCanForward = treeHistIdx < treeHistory.length - 1;
 
   function handleSelectEra(era: string) {
     setSelectedEra(era);
@@ -77,12 +119,14 @@ export default function App() {
 
   const hasUncategorized = nullEraNodeIds.length > 0;
 
-  // When dataset changes, reset navigation
+  // When dataset changes, reset all navigation
   function handleSetActiveKey(k: typeof activeKey) {
     setActiveKey(k);
     setSelectedItemId(null);
     setDetailNodeId(null);
     setSelectedEra(null);
+    setTreeHistory([]);
+    setTreeHistIdx(-1);
     setView('era');
   }
 
@@ -145,6 +189,8 @@ export default function App() {
         hasBoth={hasBoth}
         activeDataset={activeDataset}
         onSelectItem={handleSelectItem}
+        preferCraftable={preferCraftable}
+        onTogglePreferCraftable={() => setPreferCraftable((v) => !v)}
       />
 
       {/* Data banner */}
@@ -184,6 +230,7 @@ export default function App() {
               rootNodeId={selectedItemId}
               activeDataset={activeDataset}
               graphIndex={graphIndex}
+              preferCraftable={preferCraftable}
               onRootChange={(id) => setSelectedItemId(id)}
             />
           )}
@@ -199,6 +246,8 @@ export default function App() {
               era={selectedEra}
               activeDataset={activeDataset}
               nullEraNodeIds={nullEraNodeIds}
+              harvestedFrom={activeDataset?.harvested_from}
+              preferCraftable={preferCraftable}
               onSelectItem={handleSelectItem}
             />
           )}
@@ -206,18 +255,56 @@ export default function App() {
           {view === 'tree' && selectedItemId && activeDataset && graphIndex && (
             <div className="flex flex-1 overflow-hidden">
               {/* Dependency tree — left 60% */}
-              <div className="w-3/5 overflow-auto border-r border-slate-700 p-4">
-                <DependencyTree
-                  rootNodeId={selectedItemId}
-                  nodes={activeDataset.nodes}
-                  graphIndex={graphIndex}
-                  onHoverNode={setHoveredNodeId}
-                  onClickNode={(id) => {
-                    setDetailNodeId(id);
-                    setHoveredNodeId(null);
-                  }}
-                  selectedNodeId={detailNodeId}
-                />
+              <div className="w-3/5 flex flex-col border-r border-slate-700">
+                {/* Navigation bar */}
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+                  <button
+                    onClick={treeBack}
+                    disabled={!treeCanBack}
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Back"
+                  >←</button>
+                  <button
+                    onClick={treeForward}
+                    disabled={!treeCanForward}
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Forward"
+                  >→</button>
+                  <span className="text-slate-200 font-medium truncate max-w-48">
+                    {activeDataset.nodes[selectedItemId]?.display_name ?? selectedItemId}
+                  </span>
+                  {treeHistory.length > 1 && (
+                    <span className="text-slate-600">{treeHistIdx + 1} / {treeHistory.length}</span>
+                  )}
+                  <div className="ml-auto flex items-center gap-1">
+                    <button
+                      onClick={() => setTreeExpandLevel((v) => v + 1)}
+                      className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
+                      title="Expand one more level of visible nodes"
+                    >Expand +1</button>
+                    {treeExpandLevel >= 0 && (
+                      <button
+                        onClick={() => setTreeExpandLevel(-1)}
+                        className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
+                        title="Collapse all auto-expanded nodes"
+                      >Collapse all</button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                  <DependencyTree
+                    rootNodeId={selectedItemId}
+                    nodes={activeDataset.nodes}
+                    graphIndex={graphIndex}
+                    harvestedFrom={activeDataset.harvested_from}
+                    preferCraftable={preferCraftable}
+                    expandLevel={treeExpandLevel}
+                    onHoverNode={setHoveredNodeId}
+                    onClickNode={(id) => { setDetailNodeId(id); setHoveredNodeId(null); }}
+                    onDoubleClickNode={(id) => navigateTreeTo(id)}
+                    selectedNodeId={detailNodeId}
+                  />
+                </div>
               </div>
               {/* Detail panel — right 40% */}
               <div className="w-2/5 overflow-auto p-4">
@@ -231,6 +318,7 @@ export default function App() {
                     nodes={activeDataset.nodes}
                     onSelectItem={handleSelectItem}
                     harvestedFrom={activeDataset.harvested_from?.[panelNodeId]}
+                    foragedFrom={activeDataset.foraged_from?.[panelNodeId]}
                   />
                 ) : (
                   <div className="text-slate-500 text-sm mt-4">

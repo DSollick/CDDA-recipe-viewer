@@ -67,6 +67,8 @@ class ResolvedData:
     item_groups: dict[str, dict]
     harvests: dict[str, dict]
     monsters: dict[str, dict]
+    terrains: dict[str, dict]        # raw terrain objects (only id/name/harvest_by_season used)
+    furnitures: dict[str, dict]      # raw furniture objects (only id/name/harvest_by_season used)
     blacklists: list[dict]
     innawood_additions: dict[str, list[dict]]
     unresolved_count: int            # copy-from targets that could not be found
@@ -108,8 +110,11 @@ def resolve(data: "LoadedData") -> ResolvedData:
                         inn_items_u + inn_rcp_u + inn_unc_u + inn_con_u + inn_prac_u +
                         inn_req_u + inn_tq_u + inn_ig_u + inn_harv_u + inn_mon_u)
 
-    abstracts = {k: v for k, v in items_res.items() if "abstract" in v}
-    items_concrete = {k: v for k, v in items_res.items() if "abstract" not in v}
+    # Concrete items have an "id" field; abstract prototypes have only "abstract".
+    # Items that copy-from an abstract parent inherit the "abstract" key, so the
+    # check must be "has id" not "lacks abstract" to avoid misclassifying them.
+    abstracts = {k: v for k, v in items_res.items() if "id" not in v}
+    items_concrete = {k: v for k, v in items_res.items() if "id" in v}
 
     return ResolvedData(
         items=items_concrete,
@@ -123,6 +128,12 @@ def resolve(data: "LoadedData") -> ResolvedData:
         item_groups=ig_res,
         harvests=harv_res,
         monsters=mon_res,
+        # Terrain/furniture are passed through without copy-from resolution:
+        # we only consume objects that *directly* carry harvest_by_season, so
+        # the small number of inherited cases (mostly _harvested tree variants)
+        # are intentionally skipped.
+        terrains=data.terrains,
+        furnitures=data.furnitures,
         blacklists=data.blacklists,
         innawood_additions=data.innawood_additions,
         unresolved_count=total_unresolved,
@@ -289,6 +300,7 @@ def _apply_mod_layer(
     mod_objects: list[dict],
     label: str,
     key_fn: "callable[[dict], str | None]",
+    mod_name: str = "innawood",
 ) -> tuple[dict[str, dict], int]:
     """
     Overlay a list of mod objects onto an already-resolved vanilla bucket.
@@ -307,6 +319,13 @@ def _apply_mod_layer(
             continue
 
         parent_id = obj.get("copy-from")
+        # Only tag as mod-sourced if this key doesn't exist in vanilla.
+        # Patches onto existing vanilla entities (case a) and new items that
+        # inherit from vanilla parents (case b, key already present) are vanilla
+        # items with mod tweaks, not mod-exclusive additions.
+        is_new = key not in resolved
+        if is_new:
+            obj = {**obj, "_mod": mod_name}
 
         if parent_id is None:
             # Case c: complete definition — replaces or adds with no inheritance

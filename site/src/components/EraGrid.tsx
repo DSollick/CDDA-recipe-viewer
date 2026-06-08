@@ -5,6 +5,8 @@ interface EraGridProps {
   era: string | null;
   activeDataset: Dataset | null;
   nullEraNodeIds: string[];
+  harvestedFrom?: Record<string, string[]>;
+  preferCraftable: boolean;
   onSelectItem: (nodeId: string) => void;
 }
 
@@ -14,7 +16,14 @@ const LEARN_METHOD_COLORS: Record<string, string> = {
   practice: 'bg-yellow-800 text-yellow-200',
 };
 
-export default function EraGrid({ era, activeDataset, nullEraNodeIds, onSelectItem }: EraGridProps) {
+function sourcePriority(node: GraphNode, harvestedFrom?: Record<string, string[]>): number {
+  if (node.learn_method !== null) return 0;
+  if (harvestedFrom?.[node.id]?.length) return 1;
+  return 2;
+}
+
+export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedFrom, preferCraftable, onSelectItem }: EraGridProps) {
+
   if (!activeDataset) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
@@ -42,7 +51,13 @@ export default function EraGrid({ era, activeDataset, nullEraNodeIds, onSelectIt
     .map((id) => activeDataset.nodes[id])
     .filter((n): n is GraphNode => n !== undefined && n.type === 'item');
 
-  items.sort((a, b) => a.display_name.localeCompare(b.display_name));
+  items.sort((a, b) => {
+    if (preferCraftable) {
+      const diff = sourcePriority(a, harvestedFrom) - sourcePriority(b, harvestedFrom);
+      if (diff !== 0) return diff;
+    }
+    return a.display_name.localeCompare(b.display_name);
+  });
 
   const eraLabel = era === '__uncategorized__' ? 'Uncategorized' : era;
 

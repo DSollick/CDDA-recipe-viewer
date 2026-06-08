@@ -13,6 +13,7 @@ export interface GraphNode {
   incomplete: boolean;
   pseudo: boolean;
   description?: string | null;
+  mod_source?: string | null;
 }
 
 export interface GraphEdge {
@@ -39,6 +40,7 @@ export interface Dataset {
   quality_providers: Record<string, string[]>; // qual_node_id → item IDs that satisfy it
   group_providers: Record<string, string[]>;   // group_id → member item IDs
   harvested_from?: Record<string, string[]>;   // item_id → monster display names
+  foraged_from?: Record<string, string[]>;     // item_id → terrain/furniture display names
 }
 
 export interface GraphMeta {

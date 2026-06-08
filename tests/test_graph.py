@@ -180,6 +180,7 @@ def _minimal_resolved():
         requirements={},
         tool_qualities={"CUT": {"id": "CUT", "type": "tool_quality", "name": {"str": "Cutting"}}},
         item_groups={},
+        harvests={}, monsters={}, terrains={}, furnitures={},
         blacklists=[],
         innawood_additions={},
         unresolved_count=0,
@@ -244,6 +245,7 @@ def test_build_alternative_components_is_default():
         },
         abstracts={}, uncrafts={}, constructions={}, practice={},
         requirements={}, tool_qualities={}, item_groups={},
+        harvests={}, monsters={}, terrains={}, furnitures={},
         blacklists=[], innawood_additions={}, unresolved_count=0,
         recipes={
             "axe": {
@@ -269,6 +271,7 @@ def test_build_multi_recipe_marks_primary():
         items={"plank": {"id": "plank", "type": "ITEM", "name": {"str": "plank"}}},
         abstracts={}, uncrafts={}, constructions={}, practice={},
         requirements={}, tool_qualities={}, item_groups={},
+        harvests={}, monsters={}, terrains={}, furnitures={},
         blacklists=[], innawood_additions={}, unresolved_count=0,
         recipes={
             "plank": {
