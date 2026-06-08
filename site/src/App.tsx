@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ViewMode } from './types';
 import { useGraph } from './hooks/useGraph';
 import Header from './components/Header';
@@ -36,6 +36,22 @@ export default function App() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
 
+  // Tree-view navigation history (mirrors GraphView's internal history)
+  const [treeHistory, setTreeHistory] = useState<string[]>([]);
+  const [treeHistIdx, setTreeHistIdx] = useState(0);
+  const suppressTreeReset = useRef(false);
+
+  useEffect(() => {
+    if (suppressTreeReset.current) {
+      suppressTreeReset.current = false;
+      return;
+    }
+    if (selectedItemId) {
+      setTreeHistory([selectedItemId]);
+      setTreeHistIdx(0);
+    }
+  }, [selectedItemId]);
+
   // Ordered list of eras present in current dataset
   const orderedEras = useMemo<string[]>(() => {
     if (!activeDataset) return [];
@@ -61,6 +77,38 @@ export default function App() {
     // Stay in graph view if already there, else switch to tree
     setView((v) => v === 'graph' ? 'graph' : 'tree');
   }
+
+  function navigateTreeTo(id: string) {
+    setTreeHistory((prev) => [...prev.slice(0, treeHistIdx + 1), id]);
+    setTreeHistIdx((i) => i + 1);
+    suppressTreeReset.current = true;
+    setSelectedItemId(id);
+    setDetailNodeId(id);
+    setHoveredNodeId(null);
+  }
+
+  function treeBack() {
+    const newIdx = treeHistIdx - 1;
+    const id = treeHistory[newIdx];
+    setTreeHistIdx(newIdx);
+    suppressTreeReset.current = true;
+    setSelectedItemId(id);
+    setDetailNodeId(id);
+    setHoveredNodeId(null);
+  }
+
+  function treeForward() {
+    const newIdx = treeHistIdx + 1;
+    const id = treeHistory[newIdx];
+    setTreeHistIdx(newIdx);
+    suppressTreeReset.current = true;
+    setSelectedItemId(id);
+    setDetailNodeId(id);
+    setHoveredNodeId(null);
+  }
+
+  const treeCanBack = treeHistIdx > 0;
+  const treeCanForward = treeHistIdx < treeHistory.length - 1;
 
   function handleSelectEra(era: string) {
     setSelectedEra(era);
@@ -206,18 +254,38 @@ export default function App() {
           {view === 'tree' && selectedItemId && activeDataset && graphIndex && (
             <div className="flex flex-1 overflow-hidden">
               {/* Dependency tree — left 60% */}
-              <div className="w-3/5 overflow-auto border-r border-slate-700 p-4">
-                <DependencyTree
-                  rootNodeId={selectedItemId}
-                  nodes={activeDataset.nodes}
-                  graphIndex={graphIndex}
-                  onHoverNode={setHoveredNodeId}
-                  onClickNode={(id) => {
-                    setDetailNodeId(id);
-                    setHoveredNodeId(null);
-                  }}
-                  selectedNodeId={detailNodeId}
-                />
+              <div className="w-3/5 flex flex-col border-r border-slate-700">
+                {/* Navigation bar */}
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+                  <button
+                    onClick={treeBack}
+                    disabled={!treeCanBack}
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Back"
+                  >←</button>
+                  <button
+                    onClick={treeForward}
+                    disabled={!treeCanForward}
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Forward"
+                  >→</button>
+                  <span className="text-slate-200 font-medium truncate max-w-48">
+                    {activeDataset.nodes[selectedItemId]?.display_name ?? selectedItemId}
+                  </span>
+                  {treeHistory.length > 1 && (
+                    <span className="text-slate-600">{treeHistIdx + 1} / {treeHistory.length}</span>
+                  )}
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                  <DependencyTree
+                    rootNodeId={selectedItemId}
+                    nodes={activeDataset.nodes}
+                    graphIndex={graphIndex}
+                    onHoverNode={setHoveredNodeId}
+                    onClickNode={(id) => navigateTreeTo(id)}
+                    selectedNodeId={detailNodeId}
+                  />
+                </div>
               </div>
               {/* Detail panel — right 40% */}
               <div className="w-2/5 overflow-auto p-4">
