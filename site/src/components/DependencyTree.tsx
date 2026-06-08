@@ -8,7 +8,7 @@ interface DependencyTreeProps {
   graphIndex: GraphIndex;
   harvestedFrom?: Record<string, string[]>;
   preferCraftable?: boolean;
-  expandAll?: boolean;
+  expandLevel?: number;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -47,7 +47,7 @@ export default function DependencyTree({
   graphIndex,
   harvestedFrom,
   preferCraftable,
-  expandAll,
+  expandLevel,
   onHoverNode,
   onClickNode,
   onDoubleClickNode,
@@ -60,13 +60,13 @@ export default function DependencyTree({
   // expandedAlts: set of "nodeId:slotKey" to show all alternatives
   const [expandedAlts, setExpandedAlts] = useState<Set<string>>(new Set());
 
-  // When collapsing all, clear manual expansion state so tree returns to root-only view
+  // When expandLevel resets to -1 (collapse all), clear manual expansion state
   React.useEffect(() => {
-    if (!expandAll) {
+    if ((expandLevel ?? -1) < 0) {
       setExpandedPaths(new Set());
       setExpandedAlts(new Set());
     }
-  }, [expandAll]);
+  }, [expandLevel]);
 
   const rootTree = buildTreeNode(
     rootNodeId,
@@ -115,7 +115,7 @@ export default function DependencyTree({
         onSetSlotActive={setSlotActive}
         harvestedFrom={harvestedFrom}
         preferCraftable={preferCraftable}
-        expandAll={expandAll}
+        expandLevel={expandLevel}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
         onDoubleClickNode={onDoubleClickNode}
@@ -140,7 +140,7 @@ interface RowProps {
   onSetSlotActive: (key: string, idx: number) => void;
   harvestedFrom?: Record<string, string[]>;
   preferCraftable?: boolean;
-  expandAll?: boolean;
+  expandLevel?: number;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -159,7 +159,7 @@ function TreeNodeRow({
   expandedAlts,
   harvestedFrom,
   preferCraftable,
-  expandAll,
+  expandLevel,
   onToggleExpand,
   onToggleAlt,
   onSetSlotActive,
@@ -185,10 +185,7 @@ function TreeNodeRow({
   const hasChildren =
     treeNode.nonComponentChildren.length > 0 || treeNode.componentSlots.length > 0;
 
-  // expandAll only fires down to this depth; stubs beyond remain collapsed
-  // (prevents freeze on items with very deep/wide dependency graphs)
-  const EXPAND_ALL_MAX_DEPTH = 5;
-  const isExpanded = isRoot || expandedPaths.has(pathKey) || (!!expandAll && treeNode.depth < EXPAND_ALL_MAX_DEPTH);
+  const isExpanded = isRoot || expandedPaths.has(pathKey) || treeNode.depth <= (expandLevel ?? -1);
 
   // For stubs: check if there are actually edges to expand
   const depEdgesExist =
@@ -301,7 +298,7 @@ function TreeNodeRow({
                 onSetSlotActive={onSetSlotActive}
                 harvestedFrom={harvestedFrom}
                 preferCraftable={preferCraftable}
-                expandAll={expandAll}
+                expandLevel={expandLevel}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
                 onDoubleClickNode={onDoubleClickNode}
@@ -363,7 +360,7 @@ function TreeNodeRow({
                       onClickNode={onClickNode}
                       harvestedFrom={harvestedFrom}
                       preferCraftable={preferCraftable}
-                      expandAll={expandAll}
+                      expandLevel={expandLevel}
                       onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}
