@@ -65,6 +65,8 @@ class ResolvedData:
     requirements: dict[str, dict]
     tool_qualities: dict[str, dict]
     item_groups: dict[str, dict]
+    harvests: dict[str, dict]
+    monsters: dict[str, dict]
     blacklists: list[dict]
     innawood_additions: dict[str, list[dict]]
     unresolved_count: int            # copy-from targets that could not be found
@@ -86,6 +88,8 @@ def resolve(data: "LoadedData") -> ResolvedData:
     req_res,     req_unres    = _resolve_bucket(data.requirements,    "requirements")
     tq_res,      tq_unres     = _resolve_bucket(data.tool_qualities,  "tool_qualities")
     ig_res,      ig_unres     = _resolve_bucket(data.item_groups,     "item_groups")
+    harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
+    mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
 
     # --- Phase 2: Innawood layer ---
     items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key)
@@ -96,10 +100,13 @@ def resolve(data: "LoadedData") -> ResolvedData:
     req_res,     inn_req_u    = _apply_mod_layer(req_res,     inn.get("requirement", []),  "requirements",  _id_key)
     tq_res,      inn_tq_u     = _apply_mod_layer(tq_res,      inn.get("tool_quality", []), "tool_qualities", _id_key)
     ig_res,      inn_ig_u     = _apply_mod_layer(ig_res,      inn.get("item_group", []),   "item_groups",   _id_key)
+    harv_res,    inn_harv_u   = _apply_mod_layer(harv_res,    inn.get("harvest", []),      "harvests",      _id_key)
+    mon_res,     inn_mon_u    = _apply_mod_layer(mon_res,     inn.get("MONSTER", []),      "monsters",      _id_key)
 
     total_unresolved = (items_unres + rcp_unres + unc_unres + con_unres + prac_unres +
-                        req_unres + tq_unres + ig_unres + inn_items_u + inn_rcp_u +
-                        inn_unc_u + inn_con_u + inn_prac_u + inn_req_u + inn_tq_u + inn_ig_u)
+                        req_unres + tq_unres + ig_unres + harv_unres + mon_unres +
+                        inn_items_u + inn_rcp_u + inn_unc_u + inn_con_u + inn_prac_u +
+                        inn_req_u + inn_tq_u + inn_ig_u + inn_harv_u + inn_mon_u)
 
     abstracts = {k: v for k, v in items_res.items() if "abstract" in v}
     items_concrete = {k: v for k, v in items_res.items() if "abstract" not in v}
@@ -114,6 +121,8 @@ def resolve(data: "LoadedData") -> ResolvedData:
         requirements=req_res,
         tool_qualities=tq_res,
         item_groups=ig_res,
+        harvests=harv_res,
+        monsters=mon_res,
         blacklists=data.blacklists,
         innawood_additions=data.innawood_additions,
         unresolved_count=total_unresolved,

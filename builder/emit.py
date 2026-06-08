@@ -77,6 +77,7 @@ def _dataset(graph: "Graph") -> dict:
         "bottlenecks": bottlenecks,
         "quality_providers": graph.quality_providers,
         "group_providers": graph.group_providers,
+        "harvested_from": graph.harvested_from,
     }
 
 

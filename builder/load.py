@@ -35,6 +35,8 @@ _TYPE_TO_BUCKET: dict[str, str] = {
     "requirement": "requirements",
     "tool_quality": "tool_qualities",
     "item_group": "item_groups",
+    "harvest": "harvests",
+    "MONSTER": "monsters",
     **{t: "blacklists" for t in BLACKLIST_TYPES},
 }
 
@@ -53,6 +55,8 @@ class LoadedData:
     requirements: dict[str, dict]
     tool_qualities: dict[str, dict]
     item_groups: dict[str, dict]
+    harvests: dict[str, dict]
+    monsters: dict[str, dict]
     blacklists: list[dict]
     innawood_additions: dict[str, list[dict]]
     vanilla_file_count: int
@@ -79,6 +83,8 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
         "requirements": {},
         "tool_qualities": {},
         "item_groups": {},
+        "harvests": {},
+        "monsters": {},
     }
     blacklists: list[dict] = []
     innawood_additions: dict[str, list[dict]] = {}
@@ -129,6 +135,8 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
         requirements=buckets["requirements"],
         tool_qualities=buckets["tool_qualities"],
         item_groups=buckets["item_groups"],
+        harvests=buckets["harvests"],
+        monsters=buckets["monsters"],
         blacklists=blacklists,
         innawood_additions=innawood_additions,
         vanilla_file_count=vanilla_file_count,
