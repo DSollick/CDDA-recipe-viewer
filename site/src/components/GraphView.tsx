@@ -33,7 +33,7 @@ const DOT_COLOR: Record<string, string> = {
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
-  group: 'bg-green-400',
+  group: 'bg-yellow-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
@@ -42,8 +42,8 @@ const DOT_COLOR: Record<string, string> = {
 function itemDotColor(gn: GraphNode, harvestedFrom?: Record<string, string[]>): string {
   if (gn.incomplete) return 'bg-slate-600';
   if (gn.learn_method !== null) return 'bg-blue-400';
-  if (gn.spawn_class === 'environment_gather') return 'bg-yellow-400';
-  if (harvestedFrom?.[gn.id]?.length) return 'bg-amber-400';
+  if (gn.spawn_class === 'environment_gather') return 'bg-amber-400';
+  if (harvestedFrom?.[gn.id]?.length) return 'bg-green-400';
   return 'bg-slate-400';
 }
 
@@ -529,7 +529,7 @@ export default function GraphView({
                 {group.alternatives.map((nodeId, idx) => {
                   const n = activeDataset.nodes[nodeId];
                   const isActive = idx === group.activeIdx;
-                  const dot = n?.learn_method !== null && n?.learn_method !== undefined ? 'bg-blue-400' : (activeDataset.harvested_from?.[nodeId]?.length ? 'bg-amber-400' : 'bg-slate-400');
+                  const dot = n?.learn_method !== null && n?.learn_method !== undefined ? 'bg-blue-400' : n?.spawn_class === 'environment_gather' ? 'bg-amber-400' : (activeDataset.harvested_from?.[nodeId]?.length ? 'bg-green-400' : 'bg-slate-400');
                   return (
                     <li key={nodeId}>
                       <button

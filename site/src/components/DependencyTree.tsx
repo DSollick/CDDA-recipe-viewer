@@ -20,7 +20,7 @@ const TYPE_DOT: Record<string, string> = {
   quality: 'bg-purple-400',
   skill: 'bg-orange-400',
   proficiency: 'bg-orange-300',
-  group: 'bg-green-400',
+  group: 'bg-yellow-400',
   construction: 'bg-teal-400',
   disassembly: 'bg-teal-400',
   practice: 'bg-teal-400',
@@ -29,8 +29,8 @@ const TYPE_DOT: Record<string, string> = {
 function itemDotColor(node: GraphNode, harvestedFrom?: Record<string, string[]>): string {
   if (node.incomplete) return 'bg-slate-600';
   if (node.learn_method !== null) return 'bg-blue-400';              // craftable
-  if (node.spawn_class === 'environment_gather') return 'bg-yellow-400'; // forageable
-  if (harvestedFrom?.[node.id]?.length) return 'bg-amber-400';      // harvestable from monsters
+  if (node.spawn_class === 'environment_gather') return 'bg-amber-400'; // forageable from terrain
+  if (harvestedFrom?.[node.id]?.length) return 'bg-green-400';       // harvestable from monsters
   return 'bg-slate-400';                                             // loot-only
 }
 
