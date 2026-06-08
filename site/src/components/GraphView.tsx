@@ -426,7 +426,7 @@ export default function GraphView({
   };
 
   const selectedMetaNode = selectedMetaId ? (
-    activeDataset.nodes[selectedMetaId] ?? rfNodes.find((n) => n.id === selectedMetaId)?.data.graphNode as GraphNode | undefined
+    activeDataset.nodes[selectedMetaId] ?? baseRfNodes.find((n) => n.id === selectedMetaId)?.data.graphNode as GraphNode | undefined
   ) : null;
   const providerIds: string[] = selectedMetaId
     ? (activeDataset.quality_providers?.[selectedMetaId] ?? activeDataset.group_providers?.[selectedMetaId] ?? [])
