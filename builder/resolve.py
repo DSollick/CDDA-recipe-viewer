@@ -307,10 +307,14 @@ def _apply_mod_layer(
         if key is None:
             continue
 
-        # Tag the object with its mod source without mutating the original
-        obj = {**obj, "_mod": mod_name}
-
         parent_id = obj.get("copy-from")
+        # Only tag as mod-sourced if this key doesn't exist in vanilla.
+        # Patches onto existing vanilla entities (case a) and new items that
+        # inherit from vanilla parents (case b, key already present) are vanilla
+        # items with mod tweaks, not mod-exclusive additions.
+        is_new = key not in resolved
+        if is_new:
+            obj = {**obj, "_mod": mod_name}
 
         if parent_id is None:
             # Case c: complete definition — replaces or adds with no inheritance
