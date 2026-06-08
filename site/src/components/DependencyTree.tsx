@@ -185,7 +185,10 @@ function TreeNodeRow({
   const hasChildren =
     treeNode.nonComponentChildren.length > 0 || treeNode.componentSlots.length > 0;
 
-  const isExpanded = isRoot || expandedPaths.has(pathKey) || !!expandAll;
+  // expandAll only fires down to this depth; stubs beyond remain collapsed
+  // (prevents freeze on items with very deep/wide dependency graphs)
+  const EXPAND_ALL_MAX_DEPTH = 5;
+  const isExpanded = isRoot || expandedPaths.has(pathKey) || (!!expandAll && treeNode.depth < EXPAND_ALL_MAX_DEPTH);
 
   // For stubs: check if there are actually edges to expand
   const depEdgesExist =
