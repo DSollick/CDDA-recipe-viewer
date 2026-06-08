@@ -7,6 +7,7 @@ interface DependencyTreeProps {
   nodes: Record<string, GraphNode>;
   graphIndex: GraphIndex;
   harvestedFrom?: Record<string, string[]>;
+  preferCraftable?: boolean;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -44,6 +45,7 @@ export default function DependencyTree({
   nodes,
   graphIndex,
   harvestedFrom,
+  preferCraftable,
   onHoverNode,
   onClickNode,
   onDoubleClickNode,
@@ -102,6 +104,7 @@ export default function DependencyTree({
         onToggleAlt={toggleAlt}
         onSetSlotActive={setSlotActive}
         harvestedFrom={harvestedFrom}
+        preferCraftable={preferCraftable}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
         onDoubleClickNode={onDoubleClickNode}
@@ -125,6 +128,7 @@ interface RowProps {
   onToggleAlt: (key: string) => void;
   onSetSlotActive: (key: string, idx: number) => void;
   harvestedFrom?: Record<string, string[]>;
+  preferCraftable?: boolean;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -142,6 +146,7 @@ function TreeNodeRow({
   slotSelections,
   expandedAlts,
   harvestedFrom,
+  preferCraftable,
   onToggleExpand,
   onToggleAlt,
   onSetSlotActive,
@@ -279,6 +284,7 @@ function TreeNodeRow({
                 onToggleAlt={onToggleAlt}
                 onSetSlotActive={onSetSlotActive}
                 harvestedFrom={harvestedFrom}
+                preferCraftable={preferCraftable}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
                 onDoubleClickNode={onDoubleClickNode}
@@ -292,7 +298,15 @@ function TreeNodeRow({
           {/* Component slots */}
           {expandedNode.componentSlots.map((slotGroup, si) => {
             const slotKey = `${treeNode.nodeId}:slot:${slotGroup.slot.slotIndex ?? si}`;
-            const activeIdx = slotSelections.get(slotKey) ?? slotGroup.activeEdgeIndex;
+            let defaultIdx = slotGroup.activeEdgeIndex;
+            if (preferCraftable && !slotSelections.has(slotKey) && slotGroup.alternatives.length > 1) {
+              const craftableIdx = slotGroup.alternatives.findIndex((alt) => {
+                const altNode = nodes[alt.nodeId];
+                return altNode?.learn_method !== null && altNode?.learn_method !== undefined;
+              });
+              if (craftableIdx !== -1) defaultIdx = craftableIdx;
+            }
+            const activeIdx = slotSelections.get(slotKey) ?? defaultIdx;
             const activeAlt = slotGroup.alternatives[activeIdx];
             const altKey = `${pathKey}::slot${si}`;
             const showingAlts = expandedAlts.has(altKey);
@@ -331,6 +345,7 @@ function TreeNodeRow({
                       onHoverNode={onHoverNode}
                       onClickNode={onClickNode}
                       harvestedFrom={harvestedFrom}
+                      preferCraftable={preferCraftable}
                       onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}
@@ -380,6 +395,7 @@ function TreeNodeRow({
                             onHoverNode={onHoverNode}
                             onClickNode={onClickNode}
                             harvestedFrom={harvestedFrom}
+                            preferCraftable={preferCraftable}
                             onDoubleClickNode={onDoubleClickNode}
                             selectedNodeId={selectedNodeId}
                             pathKey={altChildPath}

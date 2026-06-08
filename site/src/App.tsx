@@ -280,6 +280,7 @@ export default function App() {
                     nodes={activeDataset.nodes}
                     graphIndex={graphIndex}
                     harvestedFrom={activeDataset.harvested_from}
+                    preferCraftable={preferCraftable}
                     onHoverNode={setHoveredNodeId}
                     onClickNode={(id) => { setDetailNodeId(id); setHoveredNodeId(null); }}
                     onDoubleClickNode={(id) => navigateTreeTo(id)}
