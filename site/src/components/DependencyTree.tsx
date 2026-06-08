@@ -209,7 +209,7 @@ function TreeNodeRow({
         onMouseLeave={() => onHoverNode(null)}
       >
         {/* Expand toggle — only show if there are (or might be) children */}
-        {(hasChildren || depEdgesExist || isStub) && !treeNode.isCycle ? (
+        {(hasChildren || depEdgesExist) && !treeNode.isCycle ? (
           <button
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
