@@ -177,7 +177,7 @@ function TreeNodeRow({
   nextAncestors.add(treeNode.nodeId);
 
   return (
-    <div className={isRoot ? '' : `ml-4 border-l pl-2 ${node?.type === 'group' ? 'border-green-700' : 'border-slate-700'}`}>
+    <div className={isRoot ? '' : 'ml-4 border-l border-slate-700 pl-2'}>
       {/* This node row */}
       <div
         className={`flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer group transition-colors ${
