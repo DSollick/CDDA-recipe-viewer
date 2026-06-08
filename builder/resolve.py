@@ -110,8 +110,11 @@ def resolve(data: "LoadedData") -> ResolvedData:
                         inn_items_u + inn_rcp_u + inn_unc_u + inn_con_u + inn_prac_u +
                         inn_req_u + inn_tq_u + inn_ig_u + inn_harv_u + inn_mon_u)
 
-    abstracts = {k: v for k, v in items_res.items() if "abstract" in v}
-    items_concrete = {k: v for k, v in items_res.items() if "abstract" not in v}
+    # Concrete items have an "id" field; abstract prototypes have only "abstract".
+    # Items that copy-from an abstract parent inherit the "abstract" key, so the
+    # check must be "has id" not "lacks abstract" to avoid misclassifying them.
+    abstracts = {k: v for k, v in items_res.items() if "id" not in v}
+    items_concrete = {k: v for k, v in items_res.items() if "id" in v}
 
     return ResolvedData(
         items=items_concrete,
