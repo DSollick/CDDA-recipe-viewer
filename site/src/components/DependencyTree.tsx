@@ -8,6 +8,7 @@ interface DependencyTreeProps {
   graphIndex: GraphIndex;
   harvestedFrom?: Record<string, string[]>;
   preferCraftable?: boolean;
+  expandAll?: boolean;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -46,6 +47,7 @@ export default function DependencyTree({
   graphIndex,
   harvestedFrom,
   preferCraftable,
+  expandAll,
   onHoverNode,
   onClickNode,
   onDoubleClickNode,
@@ -57,6 +59,14 @@ export default function DependencyTree({
   const [slotSelections, setSlotSelections] = useState<Map<string, number>>(new Map());
   // expandedAlts: set of "nodeId:slotKey" to show all alternatives
   const [expandedAlts, setExpandedAlts] = useState<Set<string>>(new Set());
+
+  // When collapsing all, clear manual expansion state so tree returns to root-only view
+  React.useEffect(() => {
+    if (!expandAll) {
+      setExpandedPaths(new Set());
+      setExpandedAlts(new Set());
+    }
+  }, [expandAll]);
 
   const rootTree = buildTreeNode(
     rootNodeId,
@@ -105,6 +115,7 @@ export default function DependencyTree({
         onSetSlotActive={setSlotActive}
         harvestedFrom={harvestedFrom}
         preferCraftable={preferCraftable}
+        expandAll={expandAll}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
         onDoubleClickNode={onDoubleClickNode}
@@ -129,6 +140,7 @@ interface RowProps {
   onSetSlotActive: (key: string, idx: number) => void;
   harvestedFrom?: Record<string, string[]>;
   preferCraftable?: boolean;
+  expandAll?: boolean;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
   onDoubleClickNode?: (id: string) => void;
@@ -147,6 +159,7 @@ function TreeNodeRow({
   expandedAlts,
   harvestedFrom,
   preferCraftable,
+  expandAll,
   onToggleExpand,
   onToggleAlt,
   onSetSlotActive,
@@ -172,7 +185,7 @@ function TreeNodeRow({
   const hasChildren =
     treeNode.nonComponentChildren.length > 0 || treeNode.componentSlots.length > 0;
 
-  const isExpanded = isRoot || expandedPaths.has(pathKey);
+  const isExpanded = isRoot || expandedPaths.has(pathKey) || !!expandAll;
 
   // For stubs: check if there are actually edges to expand
   const depEdgesExist =
@@ -285,6 +298,7 @@ function TreeNodeRow({
                 onSetSlotActive={onSetSlotActive}
                 harvestedFrom={harvestedFrom}
                 preferCraftable={preferCraftable}
+                expandAll={expandAll}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
                 onDoubleClickNode={onDoubleClickNode}
@@ -346,6 +360,7 @@ function TreeNodeRow({
                       onClickNode={onClickNode}
                       harvestedFrom={harvestedFrom}
                       preferCraftable={preferCraftable}
+                      expandAll={expandAll}
                       onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}

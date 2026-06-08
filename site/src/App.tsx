@@ -40,6 +40,7 @@ export default function App() {
   // Tree-view navigation history — shared by all item-navigation paths
   const [treeHistory, setTreeHistory] = useState<string[]>([]);
   const [treeHistIdx, setTreeHistIdx] = useState(-1);
+  const [treeExpandAll, setTreeExpandAll] = useState(false);
 
   // Ordered list of eras present in current dataset
   const orderedEras = useMemo<string[]>(() => {
@@ -70,6 +71,7 @@ export default function App() {
     setSelectedItemId(nodeId);
     setDetailNodeId(nodeId);
     setHoveredNodeId(null);
+    setTreeExpandAll(false);
   }
 
   function handleSelectItem(nodeId: string) {
@@ -274,6 +276,15 @@ export default function App() {
                   {treeHistory.length > 1 && (
                     <span className="text-slate-600">{treeHistIdx + 1} / {treeHistory.length}</span>
                   )}
+                  <button
+                    onClick={() => setTreeExpandAll((v) => !v)}
+                    className={`ml-auto px-2 py-1 rounded border transition-colors ${
+                      treeExpandAll
+                        ? 'border-slate-500 text-slate-200 bg-slate-700'
+                        : 'border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400'
+                    }`}
+                    title={treeExpandAll ? 'Collapse all nodes' : 'Expand all nodes'}
+                  >{treeExpandAll ? 'Collapse all' : 'Expand all'}</button>
                 </div>
                 <div className="flex-1 overflow-auto p-4">
                   <DependencyTree
@@ -282,6 +293,7 @@ export default function App() {
                     graphIndex={graphIndex}
                     harvestedFrom={activeDataset.harvested_from}
                     preferCraftable={preferCraftable}
+                    expandAll={treeExpandAll}
                     onHoverNode={setHoveredNodeId}
                     onClickNode={(id) => { setDetailNodeId(id); setHoveredNodeId(null); }}
                     onDoubleClickNode={(id) => navigateTreeTo(id)}
