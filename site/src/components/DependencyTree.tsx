@@ -8,6 +8,7 @@ interface DependencyTreeProps {
   graphIndex: GraphIndex;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
+  onDoubleClickNode?: (id: string) => void;
   selectedNodeId: string | null;
 }
 
@@ -37,6 +38,7 @@ export default function DependencyTree({
   graphIndex,
   onHoverNode,
   onClickNode,
+  onDoubleClickNode,
   selectedNodeId,
 }: DependencyTreeProps) {
   // expandedNodes: Set of nodeId+depth keys that are manually expanded beyond default
@@ -93,6 +95,7 @@ export default function DependencyTree({
         onSetSlotActive={setSlotActive}
         onHoverNode={onHoverNode}
         onClickNode={onClickNode}
+        onDoubleClickNode={onDoubleClickNode}
         selectedNodeId={selectedNodeId}
         pathKey={rootNodeId}
         ancestorPath={new Set([rootNodeId])}
@@ -114,6 +117,7 @@ interface RowProps {
   onSetSlotActive: (key: string, idx: number) => void;
   onHoverNode: (id: string | null) => void;
   onClickNode: (id: string) => void;
+  onDoubleClickNode?: (id: string) => void;
   selectedNodeId: string | null;
   pathKey: string;
   ancestorPath: Set<string>;
@@ -132,6 +136,7 @@ function TreeNodeRow({
   onSetSlotActive,
   onHoverNode,
   onClickNode,
+  onDoubleClickNode,
   selectedNodeId,
   pathKey,
   ancestorPath,
@@ -184,6 +189,7 @@ function TreeNodeRow({
           isSelected ? 'bg-slate-700' : 'hover:bg-slate-800'
         }`}
         onClick={() => onClickNode(treeNode.nodeId)}
+        onDoubleClick={() => onDoubleClickNode?.(treeNode.nodeId)}
         onMouseEnter={() => onHoverNode(treeNode.nodeId)}
         onMouseLeave={() => onHoverNode(null)}
       >
@@ -259,6 +265,7 @@ function TreeNodeRow({
                 onSetSlotActive={onSetSlotActive}
                 onHoverNode={onHoverNode}
                 onClickNode={onClickNode}
+                onDoubleClickNode={onDoubleClickNode}
                 selectedNodeId={selectedNodeId}
                 pathKey={childPath}
                 ancestorPath={nextAncestors}
@@ -307,6 +314,7 @@ function TreeNodeRow({
                       onSetSlotActive={onSetSlotActive}
                       onHoverNode={onHoverNode}
                       onClickNode={onClickNode}
+                      onDoubleClickNode={onDoubleClickNode}
                       selectedNodeId={selectedNodeId}
                       pathKey={childPathKey}
                       ancestorPath={nextAncestors}
@@ -354,6 +362,7 @@ function TreeNodeRow({
                             onSetSlotActive={onSetSlotActive}
                             onHoverNode={onHoverNode}
                             onClickNode={onClickNode}
+                            onDoubleClickNode={onDoubleClickNode}
                             selectedNodeId={selectedNodeId}
                             pathKey={altChildPath}
                             ancestorPath={nextAncestors}

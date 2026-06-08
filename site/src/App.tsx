@@ -283,7 +283,8 @@ export default function App() {
                     nodes={activeDataset.nodes}
                     graphIndex={graphIndex}
                     onHoverNode={setHoveredNodeId}
-                    onClickNode={(id) => navigateTreeTo(id)}
+                    onClickNode={(id) => { setDetailNodeId(id); setHoveredNodeId(null); }}
+                    onDoubleClickNode={(id) => navigateTreeTo(id)}
                     selectedNodeId={detailNodeId}
                   />
                 </div>
