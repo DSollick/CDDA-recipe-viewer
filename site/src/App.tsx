@@ -32,6 +32,7 @@ export default function App() {
 
   const [view, setView] = useState<ViewMode>('era');
   const [selectedEra, setSelectedEra] = useState<string | null>(null);
+  const [preferCraftable, setPreferCraftable] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
@@ -186,6 +187,8 @@ export default function App() {
         hasBoth={hasBoth}
         activeDataset={activeDataset}
         onSelectItem={handleSelectItem}
+        preferCraftable={preferCraftable}
+        onTogglePreferCraftable={() => setPreferCraftable((v) => !v)}
       />
 
       {/* Data banner */}
@@ -226,7 +229,6 @@ export default function App() {
               activeDataset={activeDataset}
               graphIndex={graphIndex}
               onRootChange={(id) => setSelectedItemId(id)}
-              onSwitchToTree={() => setView('tree')}
             />
           )}
 
@@ -242,6 +244,7 @@ export default function App() {
               activeDataset={activeDataset}
               nullEraNodeIds={nullEraNodeIds}
               harvestedFrom={activeDataset?.harvested_from}
+              preferCraftable={preferCraftable}
               onSelectItem={handleSelectItem}
             />
           )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Dataset, GraphNode } from '../types';
 
 interface EraGridProps {
@@ -6,6 +6,7 @@ interface EraGridProps {
   activeDataset: Dataset | null;
   nullEraNodeIds: string[];
   harvestedFrom?: Record<string, string[]>;
+  preferCraftable: boolean;
   onSelectItem: (nodeId: string) => void;
 }
 
@@ -21,8 +22,7 @@ function sourcePriority(node: GraphNode, harvestedFrom?: Record<string, string[]
   return 2;
 }
 
-export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedFrom, onSelectItem }: EraGridProps) {
-  const [preferCraftable, setPreferCraftable] = useState(false);
+export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedFrom, preferCraftable, onSelectItem }: EraGridProps) {
 
   if (!activeDataset) {
     return (
@@ -63,23 +63,10 @@ export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedF
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-slate-200 capitalize">
-          {eraLabel}
-          <span className="ml-2 text-sm font-normal text-slate-500">{items.length} items</span>
-        </h2>
-        <button
-          onClick={() => setPreferCraftable((v) => !v)}
-          className={`ml-auto text-xs px-2.5 py-1 rounded border transition-colors ${
-            preferCraftable
-              ? 'bg-blue-900 border-blue-600 text-blue-200'
-              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
-          }`}
-          title="Sort craftable items first, then harvestable, then loot-only"
-        >
-          Craftable first
-        </button>
-      </div>
+      <h2 className="text-lg font-semibold text-slate-200 mb-4 capitalize">
+        {eraLabel}
+        <span className="ml-2 text-sm font-normal text-slate-500">{items.length} items</span>
+      </h2>
 
       {items.length === 0 ? (
         <div className="text-slate-500 text-sm">No items in this era.</div>

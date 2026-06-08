@@ -234,7 +234,6 @@ interface GraphViewProps {
   activeDataset: Dataset;
   graphIndex: GraphIndex;
   onRootChange: (id: string) => void;
-  onSwitchToTree: () => void;
 }
 
 export default function GraphView({
@@ -242,7 +241,6 @@ export default function GraphView({
   activeDataset,
   graphIndex,
   onRootChange,
-  onSwitchToTree,
 }: GraphViewProps) {
   const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
@@ -282,21 +280,31 @@ export default function GraphView({
 
   const currentNode = activeDataset.nodes[currentRoot];
 
+  // Timer-based double-click: ReactFlow's onNodeDoubleClick is unreliable across versions.
+  const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+
   const handleNodeClick: NodeMouseHandler = (_evt, node) => {
     const gn = node.data.graphNode as GraphNode;
+    const now = Date.now();
+    const last = lastClickRef.current;
+
+    if (last && last.id === node.id && now - last.time < 300) {
+      // Double-click: navigate
+      lastClickRef.current = null;
+      if (node.id === currentRoot) return;
+      if ((gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') && node.data.hasDeps) {
+        navigateTo(node.id);
+      }
+      return;
+    }
+
+    lastClickRef.current = { id: node.id, time: now };
+
+    // Single-click: toggle meta panel for quality/group
     if (gn.type === 'quality' || gn.type === 'group') {
       setSelectedMetaId((prev) => (prev === node.id ? null : node.id));
     } else {
       setSelectedMetaId(null);
-    }
-  };
-
-  const handleNodeDoubleClick: NodeMouseHandler = (_evt, node) => {
-    if (node.id === currentRoot) return;
-    const gn = node.data.graphNode as GraphNode;
-    if (gn.type === 'item' || gn.type === 'construction' || gn.type === 'practice') {
-      if (!node.data.hasDeps) return;
-      navigateTo(node.id);
     }
   };
 
@@ -311,14 +319,6 @@ export default function GraphView({
     <div className="flex flex-col h-full">
       {/* Controls */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
-        <button
-          onClick={onSwitchToTree}
-          className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
-          title="Back to Browse view"
-        >Browse</button>
-
-        <div className="w-px h-4 bg-slate-700" />
-
         <button
           onClick={() => setHistIdx((i) => i - 1)}
           disabled={!canBack}
@@ -371,7 +371,6 @@ export default function GraphView({
           edges={rfEdges}
           nodeTypes={NODE_TYPES}
           onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
           fitView
           fitViewOptions={{ padding: 0.12 }}
           colorMode="dark"
