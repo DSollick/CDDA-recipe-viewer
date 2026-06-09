@@ -110,17 +110,31 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
 
       {/* Book sources */}
       {node.book_sources.length > 0 && (
-        <DetailRow label="Book sources">
+        <DetailRow label={node.learn_method === 'autolearn' ? 'Also in books' : 'Book sources'}>
           <ul className="space-y-0.5">
             {(node.book_sources as Array<{ book: string; skill_level?: number } | string>).map(
-              (bs, i) => (
-                <li key={i} className="text-slate-300 text-sm">
-                  {typeof bs === 'string' ? bs : bs.book}
-                  {typeof bs !== 'string' && bs.skill_level !== undefined && (
-                    <span className="text-slate-500 ml-1">lvl {bs.skill_level}</span>
-                  )}
-                </li>
-              )
+              (bs, i) => {
+                const bookId = typeof bs === 'string' ? bs : bs.book;
+                const skillLevel = typeof bs !== 'string' ? bs.skill_level : undefined;
+                const bookNode = nodes?.[bookId];
+                return (
+                  <li key={i} className="text-sm flex items-baseline gap-1">
+                    {onSelectItem ? (
+                      <button
+                        onClick={() => onSelectItem(bookId)}
+                        className="text-left text-blue-300 hover:text-blue-100 hover:underline"
+                      >
+                        {bookNode?.display_name ?? bookId}
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">{bookNode?.display_name ?? bookId}</span>
+                    )}
+                    {skillLevel !== undefined && (
+                      <span className="text-slate-500">lvl {skillLevel}</span>
+                    )}
+                  </li>
+                );
+              }
             )}
           </ul>
         </DetailRow>
