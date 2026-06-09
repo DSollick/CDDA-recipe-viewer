@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ViewMode } from './types';
 import { useGraph } from './hooks/useGraph';
 import Header from './components/Header';
