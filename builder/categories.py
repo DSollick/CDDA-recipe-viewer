@@ -87,8 +87,13 @@ def classify_item(item: dict) -> str | None:
     if item.get("bionic_id"):
         return "bionics"
 
-    # 6. Books
-    if item.get("book_skill"):
+    # 6. Books — require book_skill + at least one other book-specific field to
+    #    avoid misclassifying items that inherit book_skill via copy-from.
+    if item.get("book_skill") and (
+        item.get("max_level") is not None
+        or item.get("required_level") is not None
+        or item.get("chapters") is not None
+    ):
         return "books"
 
     # 7. Armor
