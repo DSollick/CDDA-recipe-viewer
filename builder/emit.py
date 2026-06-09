@@ -48,6 +48,14 @@ def _builder_version() -> str:
         return "dev"
 
 
+def _build_category_buckets(graph: "Graph") -> dict[str, list[str]]:
+    buckets: dict[str, list[str]] = {}
+    for nid, node in graph.nodes.items():
+        if node.category is not None:
+            buckets.setdefault(node.category, []).append(nid)
+    return buckets
+
+
 def _build_era_buckets(graph: "Graph") -> dict[str, list[str]]:
     buckets: dict[str, list[str]] = {}
     for nid, node in graph.nodes.items():
@@ -79,6 +87,7 @@ def _dataset(graph: "Graph") -> dict:
         "group_providers": graph.group_providers,
         "harvested_from": graph.harvested_from,
         "foraged_from": graph.foraged_from,
+        "categories": _build_category_buckets(graph),
     }
 
 

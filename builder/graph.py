@@ -57,6 +57,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from builder.resolve import ResolvedData
 
+from builder.categories import classify_item
+
 log = logging.getLogger(__name__)
 
 
@@ -70,6 +72,7 @@ class Node:
     type: str                                           # item | construction | disassembly | practice | quality | skill | proficiency | group
     display_name: str
     era: str | None = None                             # filled by eras.py
+    category: str | None = None                        # filled by categories.py (weapons, tools, food, …)
     learn_method: str | None = None                    # autolearn | book | practice | construction | None
     book_sources: list = dataclasses.field(default_factory=list)
     skill_requirements: list = dataclasses.field(default_factory=list)
@@ -329,6 +332,7 @@ def _make_item_node(item_id: str, item: dict) -> Node:
         pseudo="PSEUDO" in flags,
         description=_description_text(item),
         mod_source=item.get("_mod") or None,
+        category=classify_item(item),
     )
 
 

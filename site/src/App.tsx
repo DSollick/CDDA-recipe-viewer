@@ -1,37 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { ViewMode } from './types';
 import { useGraph } from './hooks/useGraph';
 import Header from './components/Header';
-import EraSidebar from './components/EraSidebar';
-import EraGrid from './components/EraGrid';
+import CategorySidebar from './components/CategorySidebar';
+import CategoryGrid from './components/CategoryGrid';
 import DependencyTree from './components/DependencyTree';
 import NodeDetail from './components/NodeDetail';
 import BottleneckView from './components/BottleneckView';
 import GraphView from './components/GraphView';
 
-// Era display order
-const ERA_ORDER = [
-  'wood',
-  'stone',
-  'bone',
-  'leather',
-  'copper',
-  'bronze',
-  'iron',
-  'glass',
-  'chemical',
-  'plastics',
-  'combustion',
-  'electrical',
-  'energy',
-];
-
 export default function App() {
   const { loadState, errorMessage, graphData, activeDataset, activeKey, setActiveKey, graphIndex, hasBoth } =
     useGraph();
 
-  const [view, setView] = useState<ViewMode>('era');
-  const [selectedEra, setSelectedEra] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>('browse');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [preferCraftable, setPreferCraftable] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -41,21 +24,6 @@ export default function App() {
   const [treeHistory, setTreeHistory] = useState<string[]>([]);
   const [treeHistIdx, setTreeHistIdx] = useState(-1);
   const [treeExpandLevel, setTreeExpandLevel] = useState(-1);
-
-  // Ordered list of eras present in current dataset
-  const orderedEras = useMemo<string[]>(() => {
-    if (!activeDataset) return [];
-    const present = new Set(Object.keys(activeDataset.eras));
-    const result: string[] = [];
-    for (const era of ERA_ORDER) {
-      if (present.has(era)) result.push(era);
-    }
-    // Add any eras not in ERA_ORDER (except null — handled as 'Uncategorized')
-    for (const era of Object.keys(activeDataset.eras)) {
-      if (!ERA_ORDER.includes(era) && !result.includes(era)) result.push(era);
-    }
-    return result;
-  }, [activeDataset]);
 
   // The node shown in the detail panel: hoveredNodeId takes priority, else detailNodeId (selected item)
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
@@ -104,30 +72,20 @@ export default function App() {
   const treeCanBack = treeHistIdx > 0;
   const treeCanForward = treeHistIdx < treeHistory.length - 1;
 
-  function handleSelectEra(era: string) {
-    setSelectedEra(era);
-    setView('era');
+  function handleSelectCategory(cat: string) {
+    setSelectedCategory(cat);
+    setView('browse');
   }
-
-  // Also handle null-era nodes as "Uncategorized"
-  const nullEraNodeIds = useMemo<string[]>(() => {
-    if (!activeDataset) return [];
-    return Object.values(activeDataset.nodes)
-      .filter((n) => n.era === null && n.type === 'item')
-      .map((n) => n.id);
-  }, [activeDataset]);
-
-  const hasUncategorized = nullEraNodeIds.length > 0;
 
   // When dataset changes, reset all navigation
   function handleSetActiveKey(k: typeof activeKey) {
     setActiveKey(k);
     setSelectedItemId(null);
     setDetailNodeId(null);
-    setSelectedEra(null);
+    setSelectedCategory(null);
     setTreeHistory([]);
     setTreeHistIdx(-1);
-    setView('era');
+    setView('browse');
   }
 
   // Data banner content
@@ -204,15 +162,12 @@ export default function App() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Era Sidebar */}
+        {/* Category Sidebar */}
         {view !== 'bottlenecks' && view !== 'graph' && (
-          <EraSidebar
-            eras={orderedEras}
+          <CategorySidebar
             activeDataset={activeDataset}
-            selectedEra={selectedEra}
-            hasUncategorized={hasUncategorized}
-            uncategorizedCount={nullEraNodeIds.length}
-            onSelectEra={handleSelectEra}
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleSelectCategory}
           />
         )}
 
@@ -237,16 +192,14 @@ export default function App() {
 
           {view === 'graph' && !selectedItemId && (
             <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-              Select an item from the era grid or search bar first.
+              Select an item from the category browser or search bar first.
             </div>
           )}
 
-          {view === 'era' && (
-            <EraGrid
-              era={selectedEra}
+          {view === 'browse' && (
+            <CategoryGrid
+              category={selectedCategory}
               activeDataset={activeDataset}
-              nullEraNodeIds={nullEraNodeIds}
-              harvestedFrom={activeDataset?.harvested_from}
               preferCraftable={preferCraftable}
               onSelectItem={handleSelectItem}
             />
@@ -331,7 +284,7 @@ export default function App() {
 
           {view === 'tree' && !selectedItemId && (
             <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-              Select an item from the era grid or search bar.
+              Select a category from the sidebar or use the search bar.
             </div>
           )}
         </main>

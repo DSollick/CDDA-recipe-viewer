@@ -14,6 +14,7 @@ export interface GraphNode {
   pseudo: boolean;
   description?: string | null;
   mod_source?: string | null;
+  category?: string | null;
 }
 
 export interface GraphEdge {
@@ -41,6 +42,7 @@ export interface Dataset {
   group_providers: Record<string, string[]>;   // group_id → member item IDs
   harvested_from?: Record<string, string[]>;   // item_id → monster display names
   foraged_from?: Record<string, string[]>;     // item_id → terrain/furniture display names
+  categories?: Record<string, string[]>;       // category_key → [node_id, ...]
 }
 
 export interface GraphMeta {
@@ -58,7 +60,7 @@ export interface GraphData {
   experimental?: Dataset;
 }
 
-export type ViewMode = 'era' | 'tree' | 'graph' | 'bottlenecks';
+export type ViewMode = 'browse' | 'tree' | 'graph' | 'bottlenecks';
 export type DatasetKey = 'stable' | 'experimental';
 
 // Adjacency index built from edges

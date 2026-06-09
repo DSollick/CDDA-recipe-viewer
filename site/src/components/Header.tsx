@@ -30,7 +30,7 @@ export default function Header({
     <header className="flex items-center gap-4 px-4 py-2 bg-slate-800 border-b border-slate-700 h-14 shrink-0">
       {/* Title */}
       <button
-        onClick={() => setView('era')}
+        onClick={() => setView('browse')}
         className="text-slate-100 font-bold text-lg whitespace-nowrap hover:text-white transition-colors"
       >
         CDDA Recipe Viewer
@@ -39,8 +39,8 @@ export default function Header({
       {/* Nav */}
       <nav className="flex items-center gap-1 ml-2">
         <NavBtn
-          active={view === 'era' || view === 'tree'}
-          onClick={() => setView(view === 'graph' ? 'tree' : 'era')}
+          active={view === 'browse' || view === 'tree'}
+          onClick={() => setView(view === 'graph' ? 'tree' : 'browse')}
         >
           Browse
         </NavBtn>
@@ -63,7 +63,7 @@ export default function Header({
             ? 'bg-blue-900 border-blue-600 text-blue-200'
             : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
         }`}
-        title="Sort era grid: craftable first, then harvestable, then loot-only"
+        title="Sort category browser: craftable first, then forageable, then loot-only"
       >
         Craftable first
       </button>
