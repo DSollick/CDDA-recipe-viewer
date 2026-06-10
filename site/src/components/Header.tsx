@@ -148,8 +148,22 @@ export default function Header({
         <div className="w-px h-4 bg-slate-700 shrink-0" />
         {modOnlyBtn}
         {craftableBtn}
-        {modSelector && <div className="w-px h-4 bg-slate-700 shrink-0" />}
-        {modSelector}
+        {mods.length > 1 && (
+          <>
+            <div className="w-px h-4 bg-slate-700 shrink-0" />
+            <select
+              value={activeModId}
+              onChange={(e) => setActiveModId(e.target.value)}
+              className={`text-xs bg-slate-700 rounded px-2 py-1 shrink-0 border ${modPalette.activeBorder} ${modPalette.activeText}`}
+            >
+              {mods.map((mod) => (
+                <option key={mod.id} value={mod.id} className="bg-slate-800 text-slate-200">
+                  {mod.label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
     </header>
   );
