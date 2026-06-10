@@ -20,8 +20,8 @@ VANILLA = ModConfig(id="vanilla", label="Vanilla", dir_name="")
 MODS: list[ModConfig] = [
     VANILLA,
     ModConfig(id="innawood",       label="Innawood",        dir_name="innawood"),
-    ModConfig(id="magiclysm",      label="Magiclysm",       dir_name="magiclysm"),
-    ModConfig(id="aftershock",     label="Aftershock",      dir_name="aftershock_exoplanet"),
-    ModConfig(id="xedra",          label="Xedra Evolved",   dir_name="xedra_evolved"),
-    ModConfig(id="mindovermatter", label="Mind Over Matter", dir_name="mindovermatter"),
+    ModConfig(id="magiclysm",      label="Magiclysm",       dir_name="Magiclysm"),
+    ModConfig(id="aftershock",     label="Aftershock",      dir_name="Aftershock"),
+    ModConfig(id="xedra",          label="Xedra Evolved",   dir_name="Xedra_Evolved"),
+    ModConfig(id="mindovermatter", label="Mind Over Matter", dir_name="MindOverMatter"),
 ]

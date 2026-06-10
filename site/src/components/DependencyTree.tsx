@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { GraphNode, GraphEdge, GraphIndex } from '../types';
 import { buildTreeNode, TreeNode } from '../lib/treeTraversal';
+import { getModPalette } from '../modColors';
 
 interface DependencyTreeProps {
   rootNodeId: string;
@@ -272,7 +273,7 @@ function TreeNodeRow({
 
         {/* Mod source */}
         {node?.mod_source && (
-          <span className="text-xs text-emerald-400 ml-1 shrink-0">{node.mod_source}</span>
+          <span className={`text-xs ml-1 shrink-0 ${getModPalette(node.mod_source).labelText}`}>{node.mod_source}</span>
         )}
 
         {/* Pseudo / incomplete */}
