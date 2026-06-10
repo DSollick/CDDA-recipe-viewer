@@ -113,10 +113,10 @@ def resolve_vanilla(data: "LoadedData") -> ResolvedData:
     )
 
 
-def resolve_with_mod(data: "LoadedData") -> ResolvedData:
+def resolve_with_mod(data: "LoadedData", mod_name: str = "mod") -> ResolvedData:
     """
     Phase 1: resolve vanilla copy-from chains.
-    Phase 2: apply Innawood mod layer on top.
+    Phase 2: apply mod layer on top, tagging new items with *mod_name*.
     """
     inn = data.mod_additions
 
@@ -131,16 +131,16 @@ def resolve_with_mod(data: "LoadedData") -> ResolvedData:
     harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
     mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
 
-    items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key)
-    recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key)
-    uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key)
-    constr_res,  inn_con_u    = _apply_mod_layer(constr_res,  inn.get("construction", []), "constructions", _id_key)
-    prac_res,    inn_prac_u   = _apply_mod_layer(prac_res,    inn.get("practice", []),     "practice",      _recipe_result_key)
-    req_res,     inn_req_u    = _apply_mod_layer(req_res,     inn.get("requirement", []),  "requirements",  _id_key)
-    tq_res,      inn_tq_u     = _apply_mod_layer(tq_res,      inn.get("tool_quality", []), "tool_qualities", _id_key)
-    ig_res,      inn_ig_u     = _apply_mod_layer(ig_res,      inn.get("item_group", []),   "item_groups",   _id_key)
-    harv_res,    inn_harv_u   = _apply_mod_layer(harv_res,    inn.get("harvest", []),      "harvests",      _id_key)
-    mon_res,     inn_mon_u    = _apply_mod_layer(mon_res,     inn.get("MONSTER", []),      "monsters",      _id_key)
+    items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key,             mod_name)
+    recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key,    mod_name)
+    uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key,    mod_name)
+    constr_res,  inn_con_u    = _apply_mod_layer(constr_res,  inn.get("construction", []), "constructions", _id_key,               mod_name)
+    prac_res,    inn_prac_u   = _apply_mod_layer(prac_res,    inn.get("practice", []),     "practice",      _recipe_result_key,    mod_name)
+    req_res,     inn_req_u    = _apply_mod_layer(req_res,     inn.get("requirement", []),  "requirements",  _id_key,               mod_name)
+    tq_res,      inn_tq_u     = _apply_mod_layer(tq_res,      inn.get("tool_quality", []), "tool_qualities", _id_key,              mod_name)
+    ig_res,      inn_ig_u     = _apply_mod_layer(ig_res,      inn.get("item_group", []),   "item_groups",   _id_key,               mod_name)
+    harv_res,    inn_harv_u   = _apply_mod_layer(harv_res,    inn.get("harvest", []),      "harvests",      _id_key,               mod_name)
+    mon_res,     inn_mon_u    = _apply_mod_layer(mon_res,     inn.get("MONSTER", []),      "monsters",      _id_key,               mod_name)
 
     total_unresolved = (items_unres + rcp_unres + unc_unres + con_unres + prac_unres +
                         req_unres + tq_unres + ig_unres + harv_unres + mon_unres +

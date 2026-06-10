@@ -12,6 +12,8 @@ interface HeaderProps {
   onSelectItem: (nodeId: string) => void;
   preferCraftable: boolean;
   onTogglePreferCraftable: () => void;
+  showModOnly: boolean;
+  onToggleShowModOnly: () => void;
 }
 
 export default function Header({
@@ -24,7 +26,11 @@ export default function Header({
   onSelectItem,
   preferCraftable,
   onTogglePreferCraftable,
+  showModOnly,
+  onToggleShowModOnly,
 }: HeaderProps) {
+  const activeMod = mods.find((m) => m.id === activeModId);
+  const isVanilla = activeModId === 'vanilla';
   return (
     <header className="flex items-center gap-4 px-4 py-2 bg-slate-800 border-b border-slate-700 h-14 shrink-0">
       {/* Title */}
@@ -53,6 +59,21 @@ export default function Header({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Mod-only filter — hidden on vanilla since it would always show 0 items */}
+      {!isVanilla && (
+        <button
+          onClick={onToggleShowModOnly}
+          className={`text-xs px-2.5 py-1 rounded border transition-colors shrink-0 ${
+            showModOnly
+              ? 'bg-violet-900 border-violet-600 text-violet-200'
+              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
+          }`}
+          title={`Show only items added by ${activeMod?.label ?? activeModId}`}
+        >
+          {activeMod?.label ?? activeModId} only
+        </button>
+      )}
 
       {/* Craftable first toggle */}
       <button

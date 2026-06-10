@@ -16,6 +16,7 @@ export default function App() {
   const [view, setView] = useState<ViewMode>('browse');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [preferCraftable, setPreferCraftable] = useState(false);
+  const [showModOnly, setShowModOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export default function App() {
     setSelectedCategory(null);
     setTreeHistory([]);
     setTreeHistIdx(-1);
+    setShowModOnly(false);
     setView('browse');
   }
 
@@ -134,6 +136,8 @@ export default function App() {
         onSelectItem={handleSelectItem}
         preferCraftable={preferCraftable}
         onTogglePreferCraftable={() => setPreferCraftable((v) => !v)}
+        showModOnly={showModOnly}
+        onToggleShowModOnly={() => setShowModOnly((v) => !v)}
       />
 
       {/* Data banner */}
@@ -152,6 +156,7 @@ export default function App() {
             activeDataset={activeDataset}
             selectedCategory={selectedCategory}
             onSelectCategory={handleSelectCategory}
+            showModOnly={showModOnly}
           />
         )}
 
@@ -184,6 +189,7 @@ export default function App() {
               category={selectedCategory}
               activeDataset={activeDataset}
               preferCraftable={preferCraftable}
+              showModOnly={showModOnly}
               onSelectItem={handleSelectItem}
             />
           )}

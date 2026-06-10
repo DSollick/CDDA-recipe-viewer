@@ -23,10 +23,11 @@ interface CategoryGridProps {
   category: string | null;
   activeDataset: Dataset | null;
   preferCraftable: boolean;
+  showModOnly: boolean;
   onSelectItem: (nodeId: string) => void;
 }
 
-export default function CategoryGrid({ category, activeDataset, preferCraftable, onSelectItem }: CategoryGridProps) {
+export default function CategoryGrid({ category, activeDataset, preferCraftable, showModOnly, onSelectItem }: CategoryGridProps) {
   if (!activeDataset) {
     return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">No dataset loaded.</div>;
   }
@@ -38,7 +39,11 @@ export default function CategoryGrid({ category, activeDataset, preferCraftable,
   const nodeIds = activeDataset.categories?.[category] ?? [];
   const items: GraphNode[] = nodeIds
     .map((id) => activeDataset.nodes[id])
-    .filter((n): n is GraphNode => n !== undefined && n.type === 'item');
+    .filter((n): n is GraphNode => {
+      if (!n || n.type !== 'item') return false;
+      if (showModOnly && !n.mod_source) return false;
+      return true;
+    });
 
   items.sort((a, b) => {
     if (preferCraftable) {

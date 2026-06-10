@@ -14,14 +14,14 @@ import shutil
 import sys
 
 
-def _build_mod(clone, mod_dir: str):
+def _build_mod(clone, mod_id: str, mod_dir: str):
     from builder import load
     from builder.resolve import resolve_vanilla, resolve_with_mod
     from builder import graph as graph_mod
     from builder import bottlenecks, eras
 
     data = load.load_all(clone, mod_dir=mod_dir)
-    resolved = resolve_vanilla(data) if not mod_dir else resolve_with_mod(data)
+    resolved = resolve_vanilla(data) if not mod_dir else resolve_with_mod(data, mod_name=mod_id)
     g = graph_mod.build(resolved)
     bottlenecks.annotate(g)
     eras.annotate(g)
@@ -56,7 +56,7 @@ def main() -> None:
         built = []
         for mod in mods_to_build:
             log.info("Building mod: %s (%s)", mod.id, mod.dir_name or "vanilla")
-            graph = _build_mod(clone, mod.dir_name)
+            graph = _build_mod(clone, mod.id, mod.dir_name)
             built.append((mod, graph))
 
         emit.emit_all(built, clone=clone, dest=args.out)

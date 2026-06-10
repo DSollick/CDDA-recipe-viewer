@@ -22,16 +22,16 @@ interface CategorySidebarProps {
   activeDataset: Dataset | null;
   selectedCategory: string | null;
   onSelectCategory: (cat: string) => void;
+  showModOnly: boolean;
 }
 
-export default function CategorySidebar({ activeDataset, selectedCategory, onSelectCategory }: CategorySidebarProps) {
+export default function CategorySidebar({ activeDataset, selectedCategory, onSelectCategory, showModOnly }: CategorySidebarProps) {
   if (!activeDataset) {
     return <aside className="w-[200px] shrink-0 bg-slate-800 border-r border-slate-700" />;
   }
 
   const categories = activeDataset.categories ?? {};
 
-  // Build ordered list: known categories first in CATEGORY_ORDER, then any extras
   const present = new Set(Object.keys(categories));
   const ordered: string[] = [];
   for (const cat of CATEGORY_ORDER) {
@@ -43,7 +43,12 @@ export default function CategorySidebar({ activeDataset, selectedCategory, onSel
 
   function itemCount(cat: string): number {
     const ids = categories[cat] ?? [];
-    return ids.filter((id) => activeDataset!.nodes[id]?.type === 'item').length;
+    return ids.filter((id) => {
+      const node = activeDataset!.nodes[id];
+      if (!node || node.type !== 'item') return false;
+      if (showModOnly && !node.mod_source) return false;
+      return true;
+    }).length;
   }
 
   return (
