@@ -79,9 +79,11 @@ def classify_item(item: dict) -> str | None:
     if item.get("gun_type") or item.get("ranged_damage"):
         return "weapons"
 
-    # 4. Ammo (ammo_type without gun_type = actual ammunition or magazines)
-    if item.get("ammo_type"):
-        return "ammo"
+    # 4. Ammo (ammo_type without gun_type = actual ammunition or magazines).
+    #    "battery" is a power-cell ammo_type used by tools/vehicles — route to tools.
+    ammo_type = item.get("ammo_type")
+    if ammo_type:
+        return "tools" if str(ammo_type).lower() == "battery" else "ammo"
 
     # 5. Bionics
     if item.get("bionic_id"):

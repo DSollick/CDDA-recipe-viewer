@@ -66,7 +66,7 @@ export default function Header({
           onClick={onToggleShowModOnly}
           className={`text-xs px-2.5 py-1 rounded border transition-colors shrink-0 ${
             showModOnly
-              ? 'bg-violet-900 border-violet-600 text-violet-200'
+              ? 'bg-emerald-900 border-emerald-600 text-emerald-200'
               : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
           }`}
           title={`Show only items added by ${activeMod?.label ?? activeModId}`}
