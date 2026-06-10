@@ -84,6 +84,18 @@ export default function App() {
     setView('browse');
   }
 
+  function handleLogoClick() {
+    if (view !== 'browse' || selectedCategory !== null) {
+      // First press: return to blank browse
+      setView('browse');
+      setSelectedCategory(null);
+    } else {
+      // Already at blank browse: full reset to vanilla with no filters
+      handleSetActiveMod('vanilla');
+      setPreferCraftable(false);
+    }
+  }
+
   const dataBanner = useMemo<string | null>(() => {
     if (!manifest) return null;
     const activeMod = manifest.mods.find((m) => m.id === activeModId);
@@ -129,6 +141,7 @@ export default function App() {
       <Header
         view={view}
         setView={setView}
+        onLogoClick={handleLogoClick}
         mods={manifest?.mods ?? []}
         activeModId={activeModId}
         setActiveModId={handleSetActiveMod}

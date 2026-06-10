@@ -1,5 +1,6 @@
 import React from 'react';
 import { GraphNode } from '../types';
+import { getModPalette } from '../modColors';
 
 interface NodeDetailProps {
   node: GraphNode;
@@ -53,7 +54,7 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
-        {node.mod_source && <Badge className="bg-emerald-900 text-emerald-300">{node.mod_source}</Badge>}
+        {node.mod_source && <Badge className={getModPalette(node.mod_source).badge}>{node.mod_source}</Badge>}
         {node.pseudo && <Badge className="bg-violet-900 text-violet-300">pseudo</Badge>}
         {node.incomplete && <Badge className="bg-red-900 text-red-300">incomplete</Badge>}
         {node.innawood_obsolete && <Badge className="bg-orange-900 text-orange-300">no recipe in innawood</Badge>}

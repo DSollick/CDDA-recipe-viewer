@@ -1,10 +1,12 @@
 import React from 'react';
 import { ViewMode, ModEntry, Dataset } from '../types';
 import SearchBar from './SearchBar';
+import { getModPalette } from '../modColors';
 
 interface HeaderProps {
   view: ViewMode;
   setView: (v: ViewMode) => void;
+  onLogoClick: () => void;
   mods: ModEntry[];
   activeModId: string;
   setActiveModId: (id: string) => void;
@@ -19,6 +21,7 @@ interface HeaderProps {
 export default function Header({
   view,
   setView,
+  onLogoClick,
   mods,
   activeModId,
   setActiveModId,
@@ -31,11 +34,12 @@ export default function Header({
 }: HeaderProps) {
   const activeMod = mods.find((m) => m.id === activeModId);
   const isVanilla = activeModId === 'vanilla';
+  const modPalette = getModPalette(activeModId);
   return (
     <header className="flex items-center gap-4 px-4 py-2 bg-slate-800 border-b border-slate-700 h-14 shrink-0">
       {/* Title */}
       <button
-        onClick={() => setView('browse')}
+        onClick={onLogoClick}
         className="text-slate-100 font-bold text-lg whitespace-nowrap hover:text-white transition-colors"
       >
         CDDA Recipe Viewer
@@ -66,7 +70,7 @@ export default function Header({
           onClick={onToggleShowModOnly}
           className={`text-xs px-2.5 py-1 rounded border transition-colors shrink-0 ${
             showModOnly
-              ? 'bg-emerald-900 border-emerald-600 text-emerald-200'
+              ? `${modPalette.activeBg} ${modPalette.activeBorder} ${modPalette.activeText}`
               : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
           }`}
           title={`Show only items added by ${activeMod?.label ?? activeModId}`}
@@ -97,6 +101,7 @@ export default function Header({
           {mods.map((mod) => (
             <ToggleBtn
               key={mod.id}
+              modId={mod.id}
               active={activeModId === mod.id}
               onClick={() => setActiveModId(mod.id)}
             >
@@ -133,19 +138,22 @@ function NavBtn({
 }
 
 function ToggleBtn({
+  modId,
   active,
   onClick,
   children,
 }: {
+  modId: string;
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const p = getModPalette(modId);
   return (
     <button
       onClick={onClick}
       className={`px-3 py-1 transition-colors ${
-        active ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+        active ? `${p.activeBg} ${p.activeText}` : 'bg-slate-800 text-slate-400 hover:text-slate-200'
       }`}
     >
       {children}

@@ -39,6 +39,8 @@ import dataclasses
 import logging
 from typing import TYPE_CHECKING
 
+from builder.load import ITEM_TYPES
+
 if TYPE_CHECKING:
     from builder.load import LoadedData
 
@@ -131,7 +133,11 @@ def resolve_with_mod(data: "LoadedData", mod_name: str = "mod") -> ResolvedData:
     harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
     mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
 
-    items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key,             mod_name)
+    # Collect mod items from all accepted item type names (modern "ITEM" + legacy types).
+    mod_items: list[dict] = []
+    for _t in ITEM_TYPES:
+        mod_items.extend(inn.get(_t, []))
+    items_res,   inn_items_u  = _apply_mod_layer(items_res,   mod_items,                   "items",         _item_key,             mod_name)
     recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key,    mod_name)
     uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key,    mod_name)
     constr_res,  inn_con_u    = _apply_mod_layer(constr_res,  inn.get("construction", []), "constructions", _id_key,               mod_name)

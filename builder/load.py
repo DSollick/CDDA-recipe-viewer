@@ -18,8 +18,14 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 # CDDA unified all item categories into a single "ITEM" type (circa 0.G+).
-# The old per-category types (AMMO, ARMOR, etc.) no longer appear in live data.
-ITEM_TYPES: frozenset[str] = frozenset({"ITEM"})
+# Bundled mods (Magiclysm, etc.) often still use the legacy per-category types,
+# so we accept all of them and let categories.py classify them properly.
+ITEM_TYPES: frozenset[str] = frozenset({
+    "ITEM",                                                           # modern (0.G+)
+    "AMMO", "ARMOR", "BOOK", "COMESTIBLE", "CONTAINER",              # legacy
+    "GENERIC", "GUN", "GUNMOD", "MAGAZINE", "MELEE",
+    "PET_ARMOR", "TOOL", "TOOL_ARMOR", "TOOLMOD",
+})
 
 BLACKLIST_TYPES: frozenset[str] = frozenset({
     "ITEM_BLACKLIST", "RECIPE_BLACKLIST",
