@@ -48,21 +48,19 @@ export interface Dataset {
 
 export interface GraphMeta {
   generated_at: string;
-  cdda_stable_tag: string | null;
-  cdda_stable_commit: string | null;
-  cdda_experimental_commit: string | null;
-  cdda_experimental_date: string | null;
+  cdda_commit: string | null;
+  cdda_date: string | null;
   builder_version: string;
 }
 
 export interface GraphData {
   meta: GraphMeta;
-  stable?: Dataset;
-  experimental?: Dataset;
+  vanilla?: Dataset;
+  innawood?: Dataset;
 }
 
 export type ViewMode = 'browse' | 'tree' | 'graph' | 'bottlenecks';
-export type DatasetKey = 'stable' | 'experimental';
+export type DatasetKey = 'vanilla' | 'innawood';
 
 // Adjacency index built from edges
 export interface GraphIndex {

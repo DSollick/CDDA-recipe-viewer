@@ -92,22 +92,16 @@ export default function App() {
   const dataBanner = useMemo<string | null>(() => {
     if (!graphData) return null;
     const meta = graphData.meta;
-    if (activeKey === 'experimental') {
-      const parts: string[] = ['Experimental'];
-      if (meta.cdda_experimental_date) {
-        const d = new Date(meta.cdda_experimental_date);
-        parts.push(`built ${d.toISOString().slice(0, 10)}`);
-      }
-      if (meta.cdda_experimental_commit) {
-        parts.push(`commit ${meta.cdda_experimental_commit.slice(0, 7)}`);
-      }
-      return parts.join(' — ');
-    } else {
-      const parts: string[] = ['Stable'];
-      if (meta.cdda_stable_tag) parts.push(`tag ${meta.cdda_stable_tag}`);
-      if (meta.cdda_stable_commit) parts.push(`commit ${meta.cdda_stable_commit.slice(0, 7)}`);
-      return parts.join(' — ');
+    const label = activeKey === 'innawood' ? 'Innawood' : 'Vanilla';
+    const parts: string[] = [label];
+    if (meta.cdda_date) {
+      const d = new Date(meta.cdda_date);
+      parts.push(`built ${d.toISOString().slice(0, 10)}`);
     }
+    if (meta.cdda_commit) {
+      parts.push(`commit ${meta.cdda_commit}`);
+    }
+    return parts.join(' — ');
   }, [graphData, activeKey]);
 
   if (loadState === 'loading') {

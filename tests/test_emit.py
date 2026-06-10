@@ -13,9 +13,9 @@ from builder.emit import emit, content_hash
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _fake_clone_result(build_type="experimental", tag=None, sha="a" * 40, date="2024-01-01T00:00:00+00:00"):
+def _fake_clone_result(sha="a" * 40, date="2024-01-01T00:00:00+00:00"):
     from builder.fetch import CloneResult
-    return CloneResult(path="/tmp/fake", build_type=build_type, tag=tag, commit_sha=sha, commit_date=date)
+    return CloneResult(path="/tmp/fake", build_type="experimental", tag=None, commit_sha=sha, commit_date=date)
 
 
 def _minimal_graph():
@@ -36,14 +36,14 @@ def test_emit_requires_at_least_one_dataset(tmp_path):
 def test_emit_writes_file(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
-    emit(experimental=(g, meta), dest=tmp_path / "graph.json")
+    emit(innawood=(g, meta), dest=tmp_path / "graph.json")
     assert (tmp_path / "graph.json").exists()
 
 
 def test_emit_dest_is_directory(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
-    emit(experimental=(g, meta), dest=tmp_path)
+    emit(innawood=(g, meta), dest=tmp_path)
     assert (tmp_path / "graph.json").exists()
 
 
@@ -51,7 +51,7 @@ def test_emit_creates_parent_dirs(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "output" / "subdir" / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     assert dest.exists()
 
 
@@ -59,7 +59,7 @@ def test_emit_valid_json(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
     assert isinstance(data, dict)
 
@@ -68,36 +68,33 @@ def test_emit_meta_fields_present(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result(sha="b" * 40, date="2024-06-01T12:00:00+00:00")
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
     m = data["meta"]
     assert "generated_at" in m
     assert "builder_version" in m
-    assert m["cdda_experimental_commit"] == "b" * 7
-    assert m["cdda_experimental_date"] == "2024-06-01T12:00:00+00:00"
-    assert m["cdda_stable_tag"] is None
-    assert m["cdda_stable_commit"] is None
+    assert m["cdda_commit"] == "b" * 7
+    assert m["cdda_date"] == "2024-06-01T12:00:00+00:00"
 
 
-def test_emit_stable_meta(tmp_path):
+def test_emit_vanilla_only(tmp_path):
     g = _minimal_graph()
-    meta = _fake_clone_result(build_type="stable", tag="0.H", sha="c" * 40)
+    meta = _fake_clone_result(sha="c" * 40)
     dest = tmp_path / "graph.json"
-    emit(stable=(g, meta), dest=dest)
+    emit(vanilla=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    assert data["meta"]["cdda_stable_tag"] == "0.H"
-    assert data["meta"]["cdda_stable_commit"] == "c" * 7
-    assert "stable" in data
-    assert "experimental" not in data
+    assert "vanilla" in data
+    assert "innawood" not in data
+    assert data["meta"]["cdda_commit"] == "c" * 7
 
 
-def test_emit_experimental_dataset_structure(tmp_path):
+def test_emit_innawood_dataset_structure(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    ds = data["experimental"]
+    ds = data["innawood"]
     assert "nodes" in ds
     assert "edges" in ds
     assert "eras" in ds
@@ -110,9 +107,9 @@ def test_emit_nodes_keyed_by_id(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    nodes = data["experimental"]["nodes"]
+    nodes = data["innawood"]["nodes"]
     assert "wooden_stake" in nodes
     assert "stick" in nodes
 
@@ -121,8 +118,8 @@ def test_emit_node_has_expected_fields(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
-    node = json.loads(dest.read_text())["experimental"]["nodes"]["wooden_stake"]
+    emit(innawood=(g, meta), dest=dest)
+    node = json.loads(dest.read_text())["innawood"]["nodes"]["wooden_stake"]
     assert node["type"] == "item"
     assert "display_name" in node
     assert "learn_method" in node
@@ -132,8 +129,8 @@ def test_emit_edges_use_from_to_keys(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
-    edges = json.loads(dest.read_text())["experimental"]["edges"]
+    emit(innawood=(g, meta), dest=dest)
+    edges = json.loads(dest.read_text())["innawood"]["edges"]
     for e in edges:
         assert "from" in e
         assert "to" in e
@@ -143,23 +140,21 @@ def test_emit_edges_use_from_to_keys(tmp_path):
 
 def test_emit_both_datasets(tmp_path):
     g = _minimal_graph()
-    stable_meta = _fake_clone_result(build_type="stable", tag="0.H", sha="s" * 40)
-    exp_meta = _fake_clone_result(build_type="experimental", sha="e" * 40)
+    meta = _fake_clone_result(sha="e" * 40)
     dest = tmp_path / "graph.json"
-    emit(stable=(g, stable_meta), experimental=(g, exp_meta), dest=dest)
+    emit(vanilla=(g, meta), innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    assert "stable" in data
-    assert "experimental" in data
-    assert data["meta"]["cdda_stable_tag"] == "0.H"
-    assert data["meta"]["cdda_experimental_commit"] == "e" * 7
+    assert "vanilla" in data
+    assert "innawood" in data
+    assert data["meta"]["cdda_commit"] == "e" * 7
 
 
 def test_emit_eras_and_bottlenecks_empty(tmp_path):
     g = _minimal_graph()
     meta = _fake_clone_result()
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
-    ds = json.loads(dest.read_text())["experimental"]
+    emit(innawood=(g, meta), dest=dest)
+    ds = json.loads(dest.read_text())["innawood"]
     assert ds["eras"] == {}
     assert ds["bottlenecks"] == []
 
@@ -188,33 +183,38 @@ def test_content_hash_stable(tmp_path):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
-def test_emit_experimental(tmp_path):
+def test_emit_both(tmp_path):
     from builder.fetch import experimental
     from builder.load import load_all
-    from builder.resolve import resolve
+    from builder.resolve import resolve_vanilla, resolve_innawood
     from builder.graph import build
 
     clone = None
     try:
         clone = experimental()
         data = load_all(clone)
-        resolved = resolve(data)
-        g = build(resolved)
+        vanilla_g = build(resolve_vanilla(data))
+        innawood_g = build(resolve_innawood(data))
         dest = tmp_path / "graph.json"
-        from builder.fetch import CloneResult
-        emit(experimental=(g, clone), dest=dest)
+        emit(vanilla=(vanilla_g, clone), innawood=(innawood_g, clone), dest=dest)
 
         raw = dest.read_text(encoding="utf-8")
         parsed = json.loads(raw)
 
-        ds = parsed["experimental"]
-        assert len(ds["nodes"]) > 5000
-        assert len(ds["edges"]) > 20000
-        assert parsed["meta"]["cdda_experimental_commit"] is not None
+        assert "vanilla" in parsed
+        assert "innawood" in parsed
+        assert parsed["meta"]["cdda_commit"] is not None
+
+        for key in ("vanilla", "innawood"):
+            ds = parsed[key]
+            assert len(ds["nodes"]) > 5000
+            assert len(ds["edges"]) > 20000
 
         size_mb = len(raw.encode()) / (1024 * 1024)
         print(f"\ngraph.json size: {size_mb:.1f} MB")
-        print(f"nodes: {len(ds['nodes'])}, edges: {len(ds['edges'])}")
+        for key in ("vanilla", "innawood"):
+            ds = parsed[key]
+            print(f"{key}: nodes={len(ds['nodes'])}, edges={len(ds['edges'])}")
 
     finally:
         if clone is not None:

@@ -20,7 +20,7 @@ export function useGraph(): UseGraphResult {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [activeKey, setActiveKey] = useState<DatasetKey>('experimental');
+  const [activeKey, setActiveKey] = useState<DatasetKey>('innawood');
 
   useEffect(() => {
     let cancelled = false;
@@ -38,11 +38,11 @@ export function useGraph(): UseGraphResult {
       })
       .then((data) => {
         if (cancelled) return;
-        // Default to experimental if available, else stable
-        if (!data.experimental && data.stable) {
-          setActiveKey('stable');
+        // Default to innawood if available, else vanilla
+        if (!data.innawood && data.vanilla) {
+          setActiveKey('vanilla');
         } else {
-          setActiveKey('experimental');
+          setActiveKey('innawood');
         }
         setGraphData(data);
         setLoadState('ready');
@@ -69,7 +69,7 @@ export function useGraph(): UseGraphResult {
     return buildGraphIndex(activeDataset.edges);
   }, [activeDataset]);
 
-  const hasBoth = Boolean(graphData?.stable && graphData?.experimental);
+  const hasBoth = Boolean(graphData?.vanilla && graphData?.innawood);
 
   return {
     loadState,

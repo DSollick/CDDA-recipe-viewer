@@ -74,14 +74,8 @@ class ResolvedData:
     unresolved_count: int            # copy-from targets that could not be found
 
 
-def resolve(data: "LoadedData") -> ResolvedData:
-    """
-    Phase 1: resolve vanilla copy-from chains.
-    Phase 2: apply Innawood mod layer on top of resolved vanilla.
-    """
-    inn = data.innawood_additions
-
-    # --- Phase 1: vanilla resolution ---
+def resolve_vanilla(data: "LoadedData") -> ResolvedData:
+    """Phase 1 only: resolve vanilla copy-from chains with no mod layer applied."""
     items_res,   items_unres  = _resolve_bucket(data.items,          "items")
     recipes_res, rcp_unres    = _resolve_bucket(data.recipes,        "recipes")
     uncraft_res, unc_unres    = _resolve_bucket(data.uncrafts,       "uncrafts")
@@ -93,7 +87,50 @@ def resolve(data: "LoadedData") -> ResolvedData:
     harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
     mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
 
-    # --- Phase 2: Innawood layer ---
+    total_unresolved = (items_unres + rcp_unres + unc_unres + con_unres + prac_unres +
+                        req_unres + tq_unres + ig_unres + harv_unres + mon_unres)
+
+    abstracts = {k: v for k, v in items_res.items() if "id" not in v}
+    items_concrete = {k: v for k, v in items_res.items() if "id" in v}
+
+    return ResolvedData(
+        items=items_concrete,
+        abstracts=abstracts,
+        recipes=recipes_res,
+        uncrafts=uncraft_res,
+        constructions=constr_res,
+        practice=prac_res,
+        requirements=req_res,
+        tool_qualities=tq_res,
+        item_groups=ig_res,
+        harvests=harv_res,
+        monsters=mon_res,
+        terrains=data.terrains,
+        furnitures=data.furnitures,
+        blacklists=data.blacklists,
+        innawood_additions=data.innawood_additions,
+        unresolved_count=total_unresolved,
+    )
+
+
+def resolve_innawood(data: "LoadedData") -> ResolvedData:
+    """
+    Phase 1: resolve vanilla copy-from chains.
+    Phase 2: apply Innawood mod layer on top.
+    """
+    inn = data.innawood_additions
+
+    items_res,   items_unres  = _resolve_bucket(data.items,          "items")
+    recipes_res, rcp_unres    = _resolve_bucket(data.recipes,        "recipes")
+    uncraft_res, unc_unres    = _resolve_bucket(data.uncrafts,       "uncrafts")
+    constr_res,  con_unres    = _resolve_bucket(data.constructions,   "constructions")
+    prac_res,    prac_unres   = _resolve_bucket(data.practice,        "practice")
+    req_res,     req_unres    = _resolve_bucket(data.requirements,    "requirements")
+    tq_res,      tq_unres     = _resolve_bucket(data.tool_qualities,  "tool_qualities")
+    ig_res,      ig_unres     = _resolve_bucket(data.item_groups,     "item_groups")
+    harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
+    mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
+
     items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key)
     recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key)
     uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key)
@@ -110,9 +147,6 @@ def resolve(data: "LoadedData") -> ResolvedData:
                         inn_items_u + inn_rcp_u + inn_unc_u + inn_con_u + inn_prac_u +
                         inn_req_u + inn_tq_u + inn_ig_u + inn_harv_u + inn_mon_u)
 
-    # Concrete items have an "id" field; abstract prototypes have only "abstract".
-    # Items that copy-from an abstract parent inherit the "abstract" key, so the
-    # check must be "has id" not "lacks abstract" to avoid misclassifying them.
     abstracts = {k: v for k, v in items_res.items() if "id" not in v}
     items_concrete = {k: v for k, v in items_res.items() if "id" in v}
 
@@ -128,16 +162,16 @@ def resolve(data: "LoadedData") -> ResolvedData:
         item_groups=ig_res,
         harvests=harv_res,
         monsters=mon_res,
-        # Terrain/furniture are passed through without copy-from resolution:
-        # we only consume objects that *directly* carry harvest_by_season, so
-        # the small number of inherited cases (mostly _harvested tree variants)
-        # are intentionally skipped.
         terrains=data.terrains,
         furnitures=data.furnitures,
         blacklists=data.blacklists,
         innawood_additions=data.innawood_additions,
         unresolved_count=total_unresolved,
     )
+
+
+# Keep the old name as an alias so existing callers (tests etc.) don't break immediately.
+resolve = resolve_innawood
 
 
 # ---------------------------------------------------------------------------

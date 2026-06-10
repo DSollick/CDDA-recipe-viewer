@@ -75,16 +75,16 @@ export default function Header({
       {hasBoth && (
         <div className="flex items-center rounded overflow-hidden border border-slate-600 text-sm shrink-0">
           <ToggleBtn
-            active={activeKey === 'stable'}
-            onClick={() => setActiveKey('stable')}
+            active={activeKey === 'vanilla'}
+            onClick={() => setActiveKey('vanilla')}
           >
-            Stable
+            Vanilla
           </ToggleBtn>
           <ToggleBtn
-            active={activeKey === 'experimental'}
-            onClick={() => setActiveKey('experimental')}
+            active={activeKey === 'innawood'}
+            onClick={() => setActiveKey('innawood')}
           >
-            Experimental
+            Innawood
           </ToggleBtn>
         </div>
       )}

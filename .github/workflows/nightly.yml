@@ -31,8 +31,8 @@ jobs:
       - name: Install Python package
         run: pip install -e .
 
-      - name: Run pipeline (experimental)
-        run: python -m builder --experimental --out site/public/graph.json
+      - name: Run pipeline (vanilla + innawood)
+        run: python -m builder --out site/public/graph.json
 
       - uses: actions/setup-node@v4
         with:

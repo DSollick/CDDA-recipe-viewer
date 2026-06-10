@@ -1,27 +1,20 @@
 """
-Serialize one or two Graph objects into the graph.json format consumed by the frontend.
+Serialize two Graph objects (vanilla + innawood) into the graph.json consumed by the frontend.
 
 Output structure
 ----------------
 {
   "meta": {
     "generated_at": "<ISO-8601>",
-    "cdda_stable_tag": "<tag>",          // null if stable not provided
-    "cdda_stable_commit": "<sha>",        // null if stable not provided
-    "cdda_experimental_commit": "<sha>",  // null if experimental not provided
-    "cdda_experimental_date": "<ISO-8601>", // null if experimental not provided
+    "cdda_commit": "<7-char sha>",
+    "cdda_date": "<ISO-8601>",
     "builder_version": "<version>"
   },
-  "stable": {
-    "nodes": { "<node_id>": { ...node }, ... },
-    "edges": [ { ...edge }, ... ],
-    "eras": {},           // populated by eras.py (not yet implemented)
-    "bottlenecks": []     // populated by bottlenecks.py (not yet implemented)
-  },
-  "experimental": { ...same structure }   // absent if experimental not provided
+  "vanilla":  { "nodes": {...}, "edges": [...], "eras": {...}, "bottlenecks": [...], ... },
+  "innawood": { ...same structure }
 }
 
-Both `stable` and `experimental` are optional individually, but at least one must be given.
+Both datasets are built from the same CDDA checkout.
 """
 
 from __future__ import annotations
@@ -69,8 +62,6 @@ def _dataset(graph: "Graph") -> dict:
     nodes = {nid: node.to_dict() for nid, node in graph.nodes.items()}
     edges = [e.to_dict() for e in graph.edges]
 
-    # Derive top-20 bottleneck list from node scores written by bottlenecks.annotate().
-    # If annotate() was never called all scores are 0 and the list stays empty.
     ranked = sorted(
         [(nid, n.bottleneck_score) for nid, n in graph.nodes.items() if n.bottleneck_score > 0],
         key=lambda x: x[1],
@@ -93,40 +84,39 @@ def _dataset(graph: "Graph") -> dict:
 
 def emit(
     *,
-    stable: "tuple[Graph, CloneResult] | None" = None,
-    experimental: "tuple[Graph, CloneResult] | None" = None,
+    vanilla: "tuple[Graph, CloneResult] | None" = None,
+    innawood: "tuple[Graph, CloneResult] | None" = None,
     dest: "str | Path",
 ) -> None:
     """
     Write graph.json to *dest*.
 
-    At least one of *stable* or *experimental* must be provided.
+    At least one of *vanilla* or *innawood* must be provided.
+    Both are typically built from the same CloneResult.
     *dest* may be a file path or a directory (file written as graph.json inside it).
     """
-    if stable is None and experimental is None:
-        raise ValueError("At least one of stable or experimental must be provided")
+    if vanilla is None and innawood is None:
+        raise ValueError("At least one of vanilla or innawood must be provided")
 
     dest = Path(dest)
     if dest.is_dir():
         dest = dest / "graph.json"
 
-    stable_graph, stable_meta = stable if stable is not None else (None, None)
-    exp_graph, exp_meta = experimental if experimental is not None else (None, None)
+    # Use whichever clone is available for meta (both come from the same checkout).
+    clone_meta = (innawood or vanilla)[1]  # type: ignore[index]
 
     meta = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "cdda_stable_tag": stable_meta.tag if stable_meta else None,
-        "cdda_stable_commit": stable_meta.commit_sha[:7] if stable_meta else None,
-        "cdda_experimental_commit": exp_meta.commit_sha[:7] if exp_meta else None,
-        "cdda_experimental_date": exp_meta.commit_date if exp_meta else None,
+        "cdda_commit": clone_meta.commit_sha[:7],
+        "cdda_date": clone_meta.commit_date,
         "builder_version": _builder_version(),
     }
 
     output: dict = {"meta": meta}
-    if stable_graph is not None:
-        output["stable"] = _dataset(stable_graph)
-    if exp_graph is not None:
-        output["experimental"] = _dataset(exp_graph)
+    if vanilla is not None:
+        output["vanilla"] = _dataset(vanilla[0])
+    if innawood is not None:
+        output["innawood"] = _dataset(innawood[0])
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(output, ensure_ascii=False, separators=(",", ":"))

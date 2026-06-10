@@ -255,9 +255,9 @@ def test_emit_includes_bottlenecks_after_annotate(tmp_path):
         tag=None, commit_sha="a" * 40, commit_date="2024-01-01T00:00:00+00:00",
     )
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    assert "c" in data["experimental"]["bottlenecks"]
+    assert "c" in data["innawood"]["bottlenecks"]
 
 
 def test_emit_bottlenecks_empty_without_annotate(tmp_path):
@@ -271,9 +271,9 @@ def test_emit_bottlenecks_empty_without_annotate(tmp_path):
         tag=None, commit_sha="a" * 40, commit_date="2024-01-01T00:00:00+00:00",
     )
     dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
+    emit(innawood=(g, meta), dest=dest)
     data = json.loads(dest.read_text())
-    assert data["experimental"]["bottlenecks"] == []
+    assert data["innawood"]["bottlenecks"] == []
 
 
 # ---------------------------------------------------------------------------
