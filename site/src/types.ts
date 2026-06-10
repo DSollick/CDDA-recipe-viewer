@@ -15,6 +15,7 @@ export interface GraphNode {
   description?: string | null;
   mod_source?: string | null;
   category?: string | null;
+  innawood_obsolete?: boolean;
 }
 
 export interface GraphEdge {

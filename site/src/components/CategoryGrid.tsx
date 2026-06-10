@@ -93,6 +93,9 @@ function ItemCard({ node, onSelect }: { node: GraphNode; onSelect: (id: string) 
         {node.mod_source && (
           <Badge className="bg-emerald-900 text-emerald-300">{node.mod_source}</Badge>
         )}
+        {node.innawood_obsolete && (
+          <Badge className="bg-orange-900 text-orange-300">no recipe in innawood</Badge>
+        )}
       </div>
       {node.craft_time && (
         <div className="text-xs text-slate-500 mt-1.5">{node.craft_time}</div>

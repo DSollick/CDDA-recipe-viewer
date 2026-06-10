@@ -84,6 +84,7 @@ class Node:
     pseudo: bool = False
     description: str | None = None
     mod_source: str | None = None                        # e.g. "innawood" | None (vanilla)
+    innawood_obsolete: bool = False                      # True when Innawood marks the vanilla recipe obsolete
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -155,10 +156,18 @@ def build(resolved: "ResolvedData") -> Graph:
         # Sort: autolearn first, then book, then others; stable sort preserves file order
         result_recipes.sort(key=_recipe_priority)
 
-        # Primary recipe → populate the item node's metadata
-        _populate_node_from_recipe(nodes[result_id], result_recipes[0][1])
+        # Filter out Innawood-obsoleted recipes and flag the node.
+        active_recipes = [(k, r) for k, r in result_recipes if not r.get("obsolete")]
+        if len(active_recipes) < len(result_recipes):
+            nodes[result_id].innawood_obsolete = True
 
-        for i, (recipe_key, recipe) in enumerate(result_recipes):
+        if not active_recipes:
+            continue
+
+        # Primary recipe → populate the item node's metadata
+        _populate_node_from_recipe(nodes[result_id], active_recipes[0][1])
+
+        for i, (recipe_key, recipe) in enumerate(active_recipes):
             is_primary = (i == 0)
             inlined = _inline_using(recipe, resolved.requirements)
             recipe_edges = _craft_edges(result_id, recipe_key, inlined, is_primary, nodes, resolved)
