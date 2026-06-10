@@ -6,14 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from builder.emit import emit, content_hash
+from builder.emit import emit_all, content_hash
+from builder.mods import VANILLA, ModConfig
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _fake_clone_result(sha="a" * 40, date="2024-01-01T00:00:00+00:00"):
+def _fake_clone(sha="a" * 40, date="2024-01-01T00:00:00+00:00"):
     from builder.fetch import CloneResult
     return CloneResult(path="/tmp/fake", build_type="experimental", tag=None, commit_sha=sha, commit_date=date)
 
@@ -24,113 +25,108 @@ def _minimal_graph():
     return build(_minimal_resolved())
 
 
+def _emit_one(tmp_path, mod=VANILLA, **clone_kwargs):
+    """Helper: emit a single-mod dataset and return (dest_dir, parsed_manifest)."""
+    g = _minimal_graph()
+    clone = _fake_clone(**clone_kwargs)
+    emit_all([(mod, g)], clone=clone, dest=tmp_path)
+    manifest = json.loads((tmp_path / "graph-manifest.json").read_text())
+    return tmp_path, manifest
+
+
 # ---------------------------------------------------------------------------
 # Unit tests
 # ---------------------------------------------------------------------------
 
-def test_emit_requires_at_least_one_dataset(tmp_path):
-    with pytest.raises(ValueError, match="[Aa]t least one"):
-        emit(dest=tmp_path / "graph.json")
+def test_emit_writes_manifest(tmp_path):
+    _, manifest = _emit_one(tmp_path)
+    assert (tmp_path / "graph-manifest.json").exists()
+    assert "mods" in manifest
 
 
-def test_emit_writes_file(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    emit(innawood=(g, meta), dest=tmp_path / "graph.json")
-    assert (tmp_path / "graph.json").exists()
-
-
-def test_emit_dest_is_directory(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    emit(innawood=(g, meta), dest=tmp_path)
-    assert (tmp_path / "graph.json").exists()
+def test_emit_writes_dataset_file(tmp_path):
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    assert (dest / fname).exists()
 
 
 def test_emit_creates_parent_dirs(tmp_path):
     g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "output" / "subdir" / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    assert dest.exists()
+    clone = _fake_clone()
+    dest = tmp_path / "output" / "subdir"
+    emit_all([(VANILLA, g)], clone=clone, dest=dest)
+    assert (dest / "graph-manifest.json").exists()
 
 
-def test_emit_valid_json(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
+def test_emit_dataset_valid_json(tmp_path):
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    data = json.loads((dest / fname).read_text())
     assert isinstance(data, dict)
 
 
-def test_emit_meta_fields_present(tmp_path):
+def test_emit_manifest_meta_fields(tmp_path):
+    _, manifest = _emit_one(tmp_path, sha="b" * 40, date="2024-06-01T12:00:00+00:00")
+    assert "generated_at" in manifest
+    assert "builder_version" in manifest
+    assert manifest["cdda_commit"] == "b" * 7
+    assert manifest["cdda_date"] == "2024-06-01T12:00:00+00:00"
+
+
+def test_emit_first_mod_is_default(tmp_path):
     g = _minimal_graph()
-    meta = _fake_clone_result(sha="b" * 40, date="2024-06-01T12:00:00+00:00")
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    m = data["meta"]
-    assert "generated_at" in m
-    assert "builder_version" in m
-    assert m["cdda_commit"] == "b" * 7
-    assert m["cdda_date"] == "2024-06-01T12:00:00+00:00"
+    clone = _fake_clone()
+    innawood = ModConfig(id="innawood", label="Innawood", dir_name="innawood")
+    emit_all([(VANILLA, g), (innawood, g)], clone=clone, dest=tmp_path)
+    manifest = json.loads((tmp_path / "graph-manifest.json").read_text())
+    assert manifest["mods"][0].get("default") is True
+    assert "default" not in manifest["mods"][1]
 
 
-def test_emit_vanilla_only(tmp_path):
+def test_emit_both_mods_present(tmp_path):
     g = _minimal_graph()
-    meta = _fake_clone_result(sha="c" * 40)
-    dest = tmp_path / "graph.json"
-    emit(vanilla=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    assert "vanilla" in data
-    assert "innawood" not in data
-    assert data["meta"]["cdda_commit"] == "c" * 7
+    clone = _fake_clone()
+    innawood = ModConfig(id="innawood", label="Innawood", dir_name="innawood")
+    emit_all([(VANILLA, g), (innawood, g)], clone=clone, dest=tmp_path)
+    manifest = json.loads((tmp_path / "graph-manifest.json").read_text())
+    ids = [m["id"] for m in manifest["mods"]]
+    assert "vanilla" in ids
+    assert "innawood" in ids
+    for mod in manifest["mods"]:
+        assert (tmp_path / mod["file"]).exists()
 
 
-def test_emit_innawood_dataset_structure(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    ds = data["innawood"]
-    assert "nodes" in ds
-    assert "edges" in ds
-    assert "eras" in ds
-    assert "bottlenecks" in ds
+def test_emit_dataset_structure(tmp_path):
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    ds = json.loads((dest / fname).read_text())
+    for key in ("nodes", "edges", "eras", "bottlenecks"):
+        assert key in ds
     assert isinstance(ds["nodes"], dict)
     assert isinstance(ds["edges"], list)
 
 
 def test_emit_nodes_keyed_by_id(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    nodes = data["innawood"]["nodes"]
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    nodes = json.loads((dest / fname).read_text())["nodes"]
     assert "wooden_stake" in nodes
     assert "stick" in nodes
 
 
 def test_emit_node_has_expected_fields(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    node = json.loads(dest.read_text())["innawood"]["nodes"]["wooden_stake"]
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    node = json.loads((dest / fname).read_text())["nodes"]["wooden_stake"]
     assert node["type"] == "item"
     assert "display_name" in node
     assert "learn_method" in node
 
 
 def test_emit_edges_use_from_to_keys(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    edges = json.loads(dest.read_text())["innawood"]["edges"]
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    edges = json.loads((dest / fname).read_text())["edges"]
     for e in edges:
         assert "from" in e
         assert "to" in e
@@ -138,23 +134,10 @@ def test_emit_edges_use_from_to_keys(tmp_path):
         assert "to_node" not in e
 
 
-def test_emit_both_datasets(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result(sha="e" * 40)
-    dest = tmp_path / "graph.json"
-    emit(vanilla=(g, meta), innawood=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    assert "vanilla" in data
-    assert "innawood" in data
-    assert data["meta"]["cdda_commit"] == "e" * 7
-
-
 def test_emit_eras_and_bottlenecks_empty(tmp_path):
-    g = _minimal_graph()
-    meta = _fake_clone_result()
-    dest = tmp_path / "graph.json"
-    emit(innawood=(g, meta), dest=dest)
-    ds = json.loads(dest.read_text())["innawood"]
+    dest, manifest = _emit_one(tmp_path)
+    fname = manifest["mods"][0]["file"]
+    ds = json.loads((dest / fname).read_text())
     assert ds["eras"] == {}
     assert ds["bottlenecks"] == []
 
@@ -183,38 +166,34 @@ def test_content_hash_stable(tmp_path):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
-def test_emit_both(tmp_path):
+def test_emit_all_mods(tmp_path):
     from builder.fetch import experimental
     from builder.load import load_all
-    from builder.resolve import resolve_vanilla, resolve_innawood
+    from builder.resolve import resolve_vanilla, resolve_with_mod
     from builder.graph import build
+    from builder.mods import MODS
 
     clone = None
     try:
         clone = experimental()
-        data = load_all(clone)
-        vanilla_g = build(resolve_vanilla(data))
-        innawood_g = build(resolve_innawood(data))
-        dest = tmp_path / "graph.json"
-        emit(vanilla=(vanilla_g, clone), innawood=(innawood_g, clone), dest=dest)
+        vanilla_data = load_all(clone, mod_dir="")
+        vanilla_g = build(resolve_vanilla(vanilla_data))
 
-        raw = dest.read_text(encoding="utf-8")
-        parsed = json.loads(raw)
+        built = [(VANILLA, vanilla_g)]
+        for mod in MODS[1:]:  # skip vanilla — already built
+            data = load_all(clone, mod_dir=mod.dir_name)
+            g = build(resolve_with_mod(data))
+            built.append((mod, g))
 
-        assert "vanilla" in parsed
-        assert "innawood" in parsed
-        assert parsed["meta"]["cdda_commit"] is not None
+        emit_all(built, clone=clone, dest=tmp_path)
 
-        for key in ("vanilla", "innawood"):
-            ds = parsed[key]
-            assert len(ds["nodes"]) > 5000
-            assert len(ds["edges"]) > 20000
+        manifest = json.loads((tmp_path / "graph-manifest.json").read_text())
+        assert len(manifest["mods"]) == len(MODS)
 
-        size_mb = len(raw.encode()) / (1024 * 1024)
-        print(f"\ngraph.json size: {size_mb:.1f} MB")
-        for key in ("vanilla", "innawood"):
-            ds = parsed[key]
-            print(f"{key}: nodes={len(ds['nodes'])}, edges={len(ds['edges'])}")
+        for mod_entry in manifest["mods"]:
+            ds = json.loads((tmp_path / mod_entry["file"]).read_text())
+            assert len(ds["nodes"]) > 5000, f"{mod_entry['id']}: too few nodes"
+            print(f"{mod_entry['id']}: nodes={len(ds['nodes'])}, edges={len(ds['edges'])}")
 
     finally:
         if clone is not None:

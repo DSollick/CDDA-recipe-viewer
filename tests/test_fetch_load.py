@@ -37,9 +37,9 @@ def test_fetch_and_load_experimental():
         print(f"Tool qualities:   {len(data.tool_qualities)}")
         print(f"Item groups:      {len(data.item_groups)}")
         print(f"Blacklists:       {len(data.blacklists)}")
-        print(f"Innawood types:   {sorted(data.innawood_additions.keys())}")
+        print(f"Innawood types:   {sorted(data.mod_additions.keys())}")
         print(f"Vanilla files:    {data.vanilla_file_count}")
-        print(f"Innawood files:   {data.innawood_file_count}")
+        print(f"Innawood files:   {data.mod_file_count}")
         print(f"Parse errors:     {data.parse_error_count}")
         print("--- End Summary ---")
 

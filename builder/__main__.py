@@ -1,11 +1,10 @@
 """
 Pipeline entry point: python -m builder [options]
 
-Full pipeline: fetch → load → resolve × 2 → graph × 2 → bottlenecks → eras → emit
+Fetches CDDA master HEAD once, then for each configured mod:
+  load → resolve → graph → bottlenecks → eras → emit
 
-Builds two datasets from a single CDDA clone:
-  vanilla   — base CDDA data, no mods
-  innawood  — vanilla + Innawood mod layer applied
+Produces one graph-<mod_id>.json per mod plus a graph-manifest.json index.
 """
 from __future__ import annotations
 
@@ -15,32 +14,28 @@ import shutil
 import sys
 
 
-def _build_both(clone):
+def _build_mod(clone, mod_dir: str):
     from builder import load
-    from builder import resolve as res_mod
+    from builder.resolve import resolve_vanilla, resolve_with_mod
     from builder import graph as graph_mod
     from builder import bottlenecks, eras
 
-    data = load.load_all(clone)
-
-    vanilla_resolved = res_mod.resolve_vanilla(data)
-    innawood_resolved = res_mod.resolve_innawood(data)
-
-    vanilla_graph = graph_mod.build(vanilla_resolved)
-    innawood_graph = graph_mod.build(innawood_resolved)
-
-    for g in (vanilla_graph, innawood_graph):
-        bottlenecks.annotate(g)
-        eras.annotate(g)
-
-    return vanilla_graph, innawood_graph
+    data = load.load_all(clone, mod_dir=mod_dir)
+    resolved = resolve_vanilla(data) if not mod_dir else resolve_with_mod(data)
+    g = graph_mod.build(resolved)
+    bottlenecks.annotate(g)
+    eras.annotate(g)
+    return g
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Build CDDA Innawood recipe graph and write graph.json"
+        description="Build CDDA recipe graphs and write per-mod graph JSON files"
     )
-    parser.add_argument("--out", required=True, metavar="PATH", help="Output path for graph.json")
+    parser.add_argument("--out", required=True, metavar="DIR",
+                        help="Output directory for graph-*.json and graph-manifest.json")
+    parser.add_argument("--mods", metavar="ID,...",
+                        help="Comma-separated mod IDs to build (default: all configured mods)")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -51,14 +46,25 @@ def main() -> None:
     )
 
     from builder import fetch, emit
+    from builder.mods import MODS
+
+    selected_ids = set(args.mods.split(",")) if args.mods else None
+    mods_to_build = [m for m in MODS if selected_ids is None or m.id in selected_ids]
 
     clone = fetch.experimental()
     try:
-        vanilla_graph, innawood_graph = _build_both(clone)
-        emit.emit(vanilla=(vanilla_graph, clone), innawood=(innawood_graph, clone), dest=args.out)
+        built = []
+        for mod in mods_to_build:
+            log.info("Building mod: %s (%s)", mod.id, mod.dir_name or "vanilla")
+            graph = _build_mod(clone, mod.dir_name)
+            built.append((mod, graph))
+
+        emit.emit_all(built, clone=clone, dest=args.out)
     finally:
         shutil.rmtree(clone.path, ignore_errors=True)
 
+
+log = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     main()

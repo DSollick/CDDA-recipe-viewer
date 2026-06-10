@@ -10,7 +10,7 @@ import BottleneckView from './components/BottleneckView';
 import GraphView from './components/GraphView';
 
 export default function App() {
-  const { loadState, errorMessage, graphData, activeDataset, activeKey, setActiveKey, graphIndex, hasBoth } =
+  const { loadState, errorMessage, manifest, activeDataset, activeModId, setActiveModId, graphIndex } =
     useGraph();
 
   const [view, setView] = useState<ViewMode>('browse');
@@ -20,17 +20,12 @@ export default function App() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
 
-  // Tree-view navigation history — shared by all item-navigation paths
   const [treeHistory, setTreeHistory] = useState<string[]>([]);
   const [treeHistIdx, setTreeHistIdx] = useState(-1);
   const [treeExpandLevel, setTreeExpandLevel] = useState(-1);
 
-  // The node shown in the detail panel: hoveredNodeId takes priority, else detailNodeId (selected item)
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
 
-  // Single unified navigation function — every path that picks a new item goes here.
-  // This ensures provider links, era grid clicks, and double-clicks in the tree all
-  // append to the same history stack so back/forward always works.
   function navigateTo(nodeId: string) {
     if (nodeId === selectedItemId) return;
     const insertAt = treeHistIdx + 1;
@@ -77,9 +72,8 @@ export default function App() {
     setView('browse');
   }
 
-  // When dataset changes, reset all navigation
-  function handleSetActiveKey(k: typeof activeKey) {
-    setActiveKey(k);
+  function handleSetActiveMod(id: string) {
+    setActiveModId(id);
     setSelectedItemId(null);
     setDetailNodeId(null);
     setSelectedCategory(null);
@@ -88,28 +82,28 @@ export default function App() {
     setView('browse');
   }
 
-  // Data banner content
   const dataBanner = useMemo<string | null>(() => {
-    if (!graphData) return null;
-    const meta = graphData.meta;
-    const label = activeKey === 'innawood' ? 'Innawood' : 'Vanilla';
-    const parts: string[] = [label];
-    if (meta.cdda_date) {
-      const d = new Date(meta.cdda_date);
+    if (!manifest) return null;
+    const activeMod = manifest.mods.find((m) => m.id === activeModId);
+    const parts: string[] = [activeMod?.label ?? activeModId];
+    if (manifest.cdda_date) {
+      const d = new Date(manifest.cdda_date);
       parts.push(`built ${d.toISOString().slice(0, 10)}`);
     }
-    if (meta.cdda_commit) {
-      parts.push(`commit ${meta.cdda_commit}`);
+    if (manifest.cdda_commit) {
+      parts.push(`commit ${manifest.cdda_commit}`);
     }
     return parts.join(' — ');
-  }, [graphData, activeKey]);
+  }, [manifest, activeModId]);
 
   if (loadState === 'loading') {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-300">
         <div className="text-center">
-          <div className="text-2xl font-bold mb-2">Loading graph data…</div>
-          <div className="text-slate-500 text-sm">Fetching /graph.json</div>
+          <div className="text-2xl font-bold mb-2">Loading…</div>
+          <div className="text-slate-500 text-sm">
+            {manifest ? `Fetching ${activeModId} dataset` : 'Fetching manifest'}
+          </div>
         </div>
       </div>
     );
@@ -123,9 +117,6 @@ export default function App() {
           <div className="text-slate-400 text-sm font-mono bg-slate-800 rounded px-4 py-2 mt-3">
             {errorMessage}
           </div>
-          <div className="text-slate-500 text-sm mt-3">
-            Make sure <code className="text-slate-300">public/graph.json</code> exists.
-          </div>
         </div>
       </div>
     );
@@ -136,9 +127,9 @@ export default function App() {
       <Header
         view={view}
         setView={setView}
-        activeKey={activeKey}
-        setActiveKey={handleSetActiveKey}
-        hasBoth={hasBoth}
+        mods={manifest?.mods ?? []}
+        activeModId={activeModId}
+        setActiveModId={handleSetActiveMod}
         activeDataset={activeDataset}
         onSelectItem={handleSelectItem}
         preferCraftable={preferCraftable}
@@ -156,7 +147,6 @@ export default function App() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Category Sidebar */}
         {view !== 'bottlenecks' && view !== 'graph' && (
           <CategorySidebar
             activeDataset={activeDataset}
@@ -165,7 +155,6 @@ export default function App() {
           />
         )}
 
-        {/* Main area */}
         <main className="flex-1 overflow-hidden flex flex-col">
           {view === 'bottlenecks' && (
             <BottleneckView
@@ -201,9 +190,7 @@ export default function App() {
 
           {view === 'tree' && selectedItemId && activeDataset && graphIndex && (
             <div className="flex flex-1 overflow-hidden">
-              {/* Dependency tree — left 60% */}
               <div className="w-3/5 flex flex-col border-r border-slate-700">
-                {/* Navigation bar */}
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
                   <button
                     onClick={treeBack}
@@ -253,7 +240,6 @@ export default function App() {
                   />
                 </div>
               </div>
-              {/* Detail panel — right 40% */}
               <div className="w-2/5 overflow-auto p-4">
                 {panelNodeId && activeDataset.nodes[panelNodeId] ? (
                   <NodeDetail

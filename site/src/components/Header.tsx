@@ -1,14 +1,13 @@
 import React from 'react';
-import { DatasetKey, ViewMode } from '../types';
+import { ViewMode, ModEntry, Dataset } from '../types';
 import SearchBar from './SearchBar';
-import { Dataset } from '../types';
 
 interface HeaderProps {
   view: ViewMode;
   setView: (v: ViewMode) => void;
-  activeKey: DatasetKey;
-  setActiveKey: (k: DatasetKey) => void;
-  hasBoth: boolean;
+  mods: ModEntry[];
+  activeModId: string;
+  setActiveModId: (id: string) => void;
   activeDataset: Dataset | null;
   onSelectItem: (nodeId: string) => void;
   preferCraftable: boolean;
@@ -18,9 +17,9 @@ interface HeaderProps {
 export default function Header({
   view,
   setView,
-  activeKey,
-  setActiveKey,
-  hasBoth,
+  mods,
+  activeModId,
+  setActiveModId,
   activeDataset,
   onSelectItem,
   preferCraftable,
@@ -71,21 +70,18 @@ export default function Header({
       {/* Search */}
       <SearchBar activeDataset={activeDataset} onSelectItem={onSelectItem} setView={setView} />
 
-      {/* Dataset toggle */}
-      {hasBoth && (
+      {/* Mod selector */}
+      {mods.length > 1 && (
         <div className="flex items-center rounded overflow-hidden border border-slate-600 text-sm shrink-0">
-          <ToggleBtn
-            active={activeKey === 'vanilla'}
-            onClick={() => setActiveKey('vanilla')}
-          >
-            Vanilla
-          </ToggleBtn>
-          <ToggleBtn
-            active={activeKey === 'innawood'}
-            onClick={() => setActiveKey('innawood')}
-          >
-            Innawood
-          </ToggleBtn>
+          {mods.map((mod) => (
+            <ToggleBtn
+              key={mod.id}
+              active={activeModId === mod.id}
+              onClick={() => setActiveModId(mod.id)}
+            >
+              {mod.label}
+            </ToggleBtn>
+          ))}
         </div>
       )}
     </header>

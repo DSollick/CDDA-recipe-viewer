@@ -8,7 +8,7 @@ Two-phase approach:
     (Kahn's algorithm). Each object ends up fully self-contained with no copy-from.
 
   Phase 2 — Innawood layer application
-    load.py keeps Innawood objects in data.innawood_additions rather than merging them
+    load.py keeps Innawood objects in data.mod_additions rather than merging them
     into the vanilla buckets, avoiding self-referential copy-from cycles (a common
     CDDA pattern where a mod patches a vanilla entity using copy-from: <same_id>).
     The three cases handled:
@@ -70,7 +70,7 @@ class ResolvedData:
     terrains: dict[str, dict]        # raw terrain objects (only id/name/harvest_by_season used)
     furnitures: dict[str, dict]      # raw furniture objects (only id/name/harvest_by_season used)
     blacklists: list[dict]
-    innawood_additions: dict[str, list[dict]]
+    mod_additions: dict[str, list[dict]]
     unresolved_count: int            # copy-from targets that could not be found
 
 
@@ -108,17 +108,17 @@ def resolve_vanilla(data: "LoadedData") -> ResolvedData:
         terrains=data.terrains,
         furnitures=data.furnitures,
         blacklists=data.blacklists,
-        innawood_additions=data.innawood_additions,
+        mod_additions=data.mod_additions,
         unresolved_count=total_unresolved,
     )
 
 
-def resolve_innawood(data: "LoadedData") -> ResolvedData:
+def resolve_with_mod(data: "LoadedData") -> ResolvedData:
     """
     Phase 1: resolve vanilla copy-from chains.
     Phase 2: apply Innawood mod layer on top.
     """
-    inn = data.innawood_additions
+    inn = data.mod_additions
 
     items_res,   items_unres  = _resolve_bucket(data.items,          "items")
     recipes_res, rcp_unres    = _resolve_bucket(data.recipes,        "recipes")
@@ -165,13 +165,13 @@ def resolve_innawood(data: "LoadedData") -> ResolvedData:
         terrains=data.terrains,
         furnitures=data.furnitures,
         blacklists=data.blacklists,
-        innawood_additions=data.innawood_additions,
+        mod_additions=data.mod_additions,
         unresolved_count=total_unresolved,
     )
 
 
 # Keep the old name as an alias so existing callers (tests etc.) don't break immediately.
-resolve = resolve_innawood
+resolve = resolve_with_mod
 
 
 # ---------------------------------------------------------------------------

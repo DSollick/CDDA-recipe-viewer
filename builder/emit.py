@@ -1,20 +1,33 @@
 """
-Serialize two Graph objects (vanilla + innawood) into the graph.json consumed by the frontend.
+Serialize Graph objects into per-mod graph JSON files consumed by the frontend.
 
-Output structure
-----------------
+Output structure (one file per mod)
+------------------------------------
+graph-<mod_id>.json:
 {
-  "meta": {
-    "generated_at": "<ISO-8601>",
-    "cdda_commit": "<7-char sha>",
-    "cdda_date": "<ISO-8601>",
-    "builder_version": "<version>"
-  },
-  "vanilla":  { "nodes": {...}, "edges": [...], "eras": {...}, "bottlenecks": [...], ... },
-  "innawood": { ...same structure }
+  "nodes": { "<node_id>": { ...node }, ... },
+  "edges": [ { ...edge }, ... ],
+  "eras": { "<era>": ["<node_id>", ...], ... },
+  "bottlenecks": ["<node_id>", ...],   // top-20 by bottleneck_score
+  "quality_providers": { ... },
+  "group_providers": { ... },
+  "harvested_from": { ... },
+  "foraged_from": { ... },
+  "categories": { "<category>": ["<node_id>", ...], ... }
 }
 
-Both datasets are built from the same CDDA checkout.
+Manifest (graph-manifest.json):
+{
+  "generated_at": "<ISO-8601>",
+  "cdda_commit": "<7-char sha>",
+  "cdda_date": "<ISO-8601>",
+  "builder_version": "<version>",
+  "mods": [
+    { "id": "vanilla",   "label": "Vanilla",   "file": "graph-vanilla.json",   "default": true },
+    { "id": "innawood",  "label": "Innawood",  "file": "graph-innawood.json"  },
+    ...
+  ]
+}
 """
 
 from __future__ import annotations
@@ -30,6 +43,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from builder.fetch import CloneResult
     from builder.graph import Graph
+    from builder.mods import ModConfig
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +72,7 @@ def _build_era_buckets(graph: "Graph") -> dict[str, list[str]]:
 
 
 def _dataset(graph: "Graph") -> dict:
-    """Serialize a single Graph into the dataset sub-object."""
+    """Serialize a Graph into the dataset object written to each graph-<mod>.json."""
     nodes = {nid: node.to_dict() for nid, node in graph.nodes.items()}
     edges = [e.to_dict() for e in graph.edges]
 
@@ -82,49 +96,51 @@ def _dataset(graph: "Graph") -> dict:
     }
 
 
-def emit(
+def emit_all(
+    mods: "list[tuple[ModConfig, Graph]]",
     *,
-    vanilla: "tuple[Graph, CloneResult] | None" = None,
-    innawood: "tuple[Graph, CloneResult] | None" = None,
+    clone: "CloneResult",
     dest: "str | Path",
 ) -> None:
     """
-    Write graph.json to *dest*.
-
-    At least one of *vanilla* or *innawood* must be provided.
-    Both are typically built from the same CloneResult.
-    *dest* may be a file path or a directory (file written as graph.json inside it).
+    Write one graph-<mod_id>.json per mod plus graph-manifest.json into *dest* directory.
     """
-    if vanilla is None and innawood is None:
-        raise ValueError("At least one of vanilla or innawood must be provided")
-
     dest = Path(dest)
-    if dest.is_dir():
-        dest = dest / "graph.json"
+    dest.mkdir(parents=True, exist_ok=True)
 
-    # Use whichever clone is available for meta (both come from the same checkout).
-    clone_meta = (innawood or vanilla)[1]  # type: ignore[index]
+    generated_at = datetime.now(timezone.utc).isoformat()
+    builder_ver = _builder_version()
 
-    meta = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "cdda_commit": clone_meta.commit_sha[:7],
-        "cdda_date": clone_meta.commit_date,
-        "builder_version": _builder_version(),
+    manifest_mods = []
+    for i, (mod, graph) in enumerate(mods):
+        filename = f"graph-{mod.id}.json"
+        filepath = dest / filename
+
+        content = json.dumps(_dataset(graph), ensure_ascii=False, separators=(",", ":"))
+        filepath.write_text(content, encoding="utf-8")
+
+        size_kb = len(content.encode()) / 1024
+        sha = hashlib.sha256(content.encode()).hexdigest()[:12]
+        log.info("Wrote %s  (%.0f KB, sha256=%.12s)", filepath, size_kb, sha)
+
+        entry: dict = {"id": mod.id, "label": mod.label, "file": filename}
+        if i == 0:
+            entry["default"] = True
+        manifest_mods.append(entry)
+
+    manifest = {
+        "generated_at": generated_at,
+        "cdda_commit": clone.commit_sha[:7],
+        "cdda_date": clone.commit_date,
+        "builder_version": builder_ver,
+        "mods": manifest_mods,
     }
-
-    output: dict = {"meta": meta}
-    if vanilla is not None:
-        output["vanilla"] = _dataset(vanilla[0])
-    if innawood is not None:
-        output["innawood"] = _dataset(innawood[0])
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    content = json.dumps(output, ensure_ascii=False, separators=(",", ":"))
-    dest.write_text(content, encoding="utf-8")
-
-    size_kb = len(content.encode()) / 1024
-    sha = hashlib.sha256(content.encode()).hexdigest()[:12]
-    log.info("Wrote %s  (%.0f KB, sha256=%.12s)", dest, size_kb, sha)
+    manifest_path = dest / "graph-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    log.info("Wrote %s  (%d mods)", manifest_path, len(mods))
 
 
 def content_hash(path: "str | Path") -> str | None:

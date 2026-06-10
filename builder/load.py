@@ -62,21 +62,26 @@ class LoadedData:
     terrains: dict[str, dict]
     furnitures: dict[str, dict]
     blacklists: list[dict]
-    innawood_additions: dict[str, list[dict]]
+    mod_additions: dict[str, list[dict]]
     vanilla_file_count: int
-    innawood_file_count: int
+    mod_file_count: int
     parse_error_count: int
 
 
-def load_all(clone: "CloneResult | str") -> LoadedData:
+def load_all(clone: "CloneResult | str", mod_dir: str = "innawood") -> LoadedData:
     """
     Entry point. Accepts a CloneResult or a plain path string.
-    Walks vanilla and innawood directories, classifies all objects,
+
+    *mod_dir* is the directory name under data/mods/ to load as the mod layer
+    (e.g. "innawood", "magiclysm"). Pass an empty string or None to load
+    vanilla only (mod_additions will be empty).
+
+    Walks vanilla and (optionally) mod directories, classifies all objects,
     validates against schemas, and returns LoadedData.
     """
     base_path = Path(clone.path if hasattr(clone, "path") else clone)
     vanilla_root = base_path / "data" / "json"
-    innawood_root = base_path / "data" / "mods" / "innawood"
+    mod_root = (base_path / "data" / "mods" / mod_dir) if mod_dir else None
 
     buckets: dict[str, dict] = {
         "items": {},
@@ -93,10 +98,10 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
         "furnitures": {},
     }
     blacklists: list[dict] = []
-    innawood_additions: dict[str, list[dict]] = {}
+    mod_additions: dict[str, list[dict]] = {}
     parse_error_count = 0
     vanilla_file_count = 0
-    innawood_file_count = 0
+    mod_file_count = 0
 
     for path in _iter_json_files(vanilla_root):
         objects = _parse_file(path)
@@ -107,24 +112,25 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
         for obj in objects:
             _dispatch(obj, buckets, blacklists)
 
-    for path in _iter_json_files(innawood_root):
-        objects = _parse_file(path)
-        if objects is None:
-            parse_error_count += 1
-            continue
-        innawood_file_count += 1
-        for obj in objects:
-            # Innawood objects go into innawood_additions only.
-            # resolve.py applies them as a second pass on top of resolved vanilla
-            # so that same-id copy-from patterns (Innawood patching a vanilla entity
-            # with the same id) don't create self-referential cycles.
-            obj_type = obj.get("type")
-            if obj_type:
-                innawood_additions.setdefault(obj_type, []).append(obj)
-            # Blacklists are the only thing we dispatch directly — they don't use
-            # copy-from and are needed regardless of resolution order.
-            if obj_type in BLACKLIST_TYPES:
-                blacklists.append(obj)
+    if mod_root and mod_root.exists():
+        for path in _iter_json_files(mod_root):
+            objects = _parse_file(path)
+            if objects is None:
+                parse_error_count += 1
+                continue
+            mod_file_count += 1
+            for obj in objects:
+                # Mod objects go into mod_additions only.
+                # resolve.py applies them as a second pass on top of resolved vanilla
+                # so that same-id copy-from patterns don't create self-referential cycles.
+                obj_type = obj.get("type")
+                if obj_type:
+                    mod_additions.setdefault(obj_type, []).append(obj)
+                # Blacklists are dispatched directly — they don't use copy-from.
+                if obj_type in BLACKLIST_TYPES:
+                    blacklists.append(obj)
+    elif mod_root:
+        log.warning("Mod directory not found: %s", mod_root)
 
     schemas = _load_schemas()
     _validate_sample(list(buckets["recipes"].values()), schemas.get("recipe"), "recipe")
@@ -146,9 +152,9 @@ def load_all(clone: "CloneResult | str") -> LoadedData:
         terrains=buckets["terrains"],
         furnitures=buckets["furnitures"],
         blacklists=blacklists,
-        innawood_additions=innawood_additions,
+        mod_additions=mod_additions,
         vanilla_file_count=vanilla_file_count,
-        innawood_file_count=innawood_file_count,
+        mod_file_count=mod_file_count,
         parse_error_count=parse_error_count,
     )
 
