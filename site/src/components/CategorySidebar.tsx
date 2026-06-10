@@ -23,14 +23,19 @@ interface CategorySidebarProps {
   selectedCategory: string | null;
   onSelectCategory: (cat: string) => void;
   showModOnly: boolean;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function CategorySidebar({ activeDataset, selectedCategory, onSelectCategory, showModOnly }: CategorySidebarProps) {
-  if (!activeDataset) {
-    return <aside className="w-[200px] shrink-0 bg-slate-800 border-r border-slate-700" />;
-  }
-
-  const categories = activeDataset.categories ?? {};
+export default function CategorySidebar({
+  activeDataset,
+  selectedCategory,
+  onSelectCategory,
+  showModOnly,
+  isOpen,
+  onClose,
+}: CategorySidebarProps) {
+  const categories = activeDataset?.categories ?? {};
 
   const present = new Set(Object.keys(categories));
   const ordered: string[] = [];
@@ -52,12 +57,29 @@ export default function CategorySidebar({ activeDataset, selectedCategory, onSel
   }
 
   return (
-    <aside className="w-[200px] shrink-0 bg-slate-800 border-r border-slate-700 overflow-y-auto flex flex-col">
-      <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-700">
-        Category
+    <aside
+      className={[
+        'w-[200px] shrink-0 bg-slate-800 border-r border-slate-700 overflow-y-auto flex flex-col',
+        // Mobile: fixed overlay, slide in/out
+        'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-in-out',
+        isOpen ? 'translate-x-0' : '-translate-x-full',
+        // Desktop: static, always visible
+        'md:static md:translate-x-0',
+      ].join(' ')}
+    >
+      <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-700 flex items-center justify-between">
+        <span>Category</span>
+        <button
+          onClick={onClose}
+          className="md:hidden text-slate-500 hover:text-slate-300 transition-colors p-0.5"
+          aria-label="Close menu"
+        >
+          ✕
+        </button>
       </div>
       <nav className="flex-1 py-1">
         {ordered.map((cat) => {
+          if (!activeDataset) return null;
           const count = itemCount(cat);
           if (count === 0) return null;
           const isActive = selectedCategory === cat;
@@ -66,7 +88,7 @@ export default function CategorySidebar({ activeDataset, selectedCategory, onSel
           return (
             <button
               key={cat}
-              onClick={() => onSelectCategory(cat)}
+              onClick={() => { onSelectCategory(cat); onClose(); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
                 isActive ? 'bg-slate-700 text-white font-medium' : 'text-slate-300 hover:bg-slate-700 hover:text-white'
               }`}

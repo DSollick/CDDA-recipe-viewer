@@ -20,6 +20,7 @@ export default function App() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [treeHistory, setTreeHistory] = useState<string[]>([]);
   const [treeHistIdx, setTreeHistIdx] = useState(-1);
@@ -86,11 +87,9 @@ export default function App() {
 
   function handleLogoClick() {
     if (view !== 'browse' || selectedCategory !== null) {
-      // First press: return to blank browse
       setView('browse');
       setSelectedCategory(null);
     } else {
-      // Already at blank browse: full reset to vanilla with no filters
       handleSetActiveMod('vanilla');
       setPreferCraftable(false);
     }
@@ -136,12 +135,15 @@ export default function App() {
     );
   }
 
+  const showSidebar = view !== 'bottlenecks' && view !== 'graph';
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col" style={{ minWidth: '1280px' }}>
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
       <Header
         view={view}
         setView={setView}
         onLogoClick={handleLogoClick}
+        onMenuClick={() => setSidebarOpen((v) => !v)}
         mods={manifest?.mods ?? []}
         activeModId={activeModId}
         setActiveModId={handleSetActiveMod}
@@ -163,17 +165,27 @@ export default function App() {
         </div>
       )}
 
+      {/* Sidebar backdrop — mobile only */}
+      {sidebarOpen && showSidebar && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="flex flex-1 overflow-hidden">
-        {view !== 'bottlenecks' && view !== 'graph' && (
+        {showSidebar && (
           <CategorySidebar
             activeDataset={activeDataset}
             selectedCategory={selectedCategory}
             onSelectCategory={handleSelectCategory}
             showModOnly={showModOnly}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
           />
         )}
 
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 overflow-hidden flex flex-col min-w-0">
           {view === 'bottlenecks' && (
             <BottleneckView
               activeDataset={activeDataset}
@@ -192,7 +204,7 @@ export default function App() {
           )}
 
           {view === 'graph' && !selectedItemId && (
-            <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+            <div className="flex-1 flex items-center justify-center text-slate-500 text-sm p-4 text-center">
               Select an item from the category browser or search bar first.
             </div>
           )}
@@ -208,28 +220,29 @@ export default function App() {
           )}
 
           {view === 'tree' && selectedItemId && activeDataset && graphIndex && (
-            <div className="flex flex-1 overflow-hidden">
-              <div className="w-3/5 flex flex-col border-r border-slate-700">
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+              {/* Tree panel */}
+              <div className="flex flex-col md:w-3/5 border-b md:border-b-0 md:border-r border-slate-700 min-h-0 md:h-full" style={{ flex: '0 0 60%' }}>
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0 overflow-x-auto">
                   <button
                     onClick={treeBack}
                     disabled={!treeCanBack}
-                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                     title="Back"
                   >←</button>
                   <button
                     onClick={treeForward}
                     disabled={!treeCanForward}
-                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                     title="Forward"
                   >→</button>
-                  <span className="text-slate-200 font-medium truncate max-w-48">
+                  <span className="text-slate-200 font-medium truncate">
                     {activeDataset.nodes[selectedItemId]?.display_name ?? selectedItemId}
                   </span>
                   {treeHistory.length > 1 && (
-                    <span className="text-slate-600">{treeHistIdx + 1} / {treeHistory.length}</span>
+                    <span className="text-slate-600 shrink-0">{treeHistIdx + 1} / {treeHistory.length}</span>
                   )}
-                  <div className="ml-auto flex items-center gap-1">
+                  <div className="ml-auto flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => setTreeExpandLevel((v) => v + 1)}
                       className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
@@ -259,7 +272,8 @@ export default function App() {
                   />
                 </div>
               </div>
-              <div className="w-2/5 overflow-auto p-4">
+              {/* Detail panel */}
+              <div className="md:w-2/5 overflow-auto p-4" style={{ flex: '0 0 40%' }}>
                 {panelNodeId && activeDataset.nodes[panelNodeId] ? (
                   <NodeDetail
                     node={activeDataset.nodes[panelNodeId]}
@@ -274,7 +288,7 @@ export default function App() {
                   />
                 ) : (
                   <div className="text-slate-500 text-sm mt-4">
-                    Click or hover a node in the tree to see details.
+                    Tap a node in the tree to see details.
                   </div>
                 )}
               </div>
@@ -282,7 +296,7 @@ export default function App() {
           )}
 
           {view === 'tree' && !selectedItemId && (
-            <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+            <div className="flex-1 flex items-center justify-center text-slate-500 text-sm p-4 text-center">
               Select a category from the sidebar or use the search bar.
             </div>
           )}
