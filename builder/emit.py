@@ -1,27 +1,33 @@
 """
-Serialize one or two Graph objects into the graph.json format consumed by the frontend.
+Serialize Graph objects into per-mod graph JSON files consumed by the frontend.
 
-Output structure
-----------------
+Output structure (one file per mod)
+------------------------------------
+graph-<mod_id>.json:
 {
-  "meta": {
-    "generated_at": "<ISO-8601>",
-    "cdda_stable_tag": "<tag>",          // null if stable not provided
-    "cdda_stable_commit": "<sha>",        // null if stable not provided
-    "cdda_experimental_commit": "<sha>",  // null if experimental not provided
-    "cdda_experimental_date": "<ISO-8601>", // null if experimental not provided
-    "builder_version": "<version>"
-  },
-  "stable": {
-    "nodes": { "<node_id>": { ...node }, ... },
-    "edges": [ { ...edge }, ... ],
-    "eras": {},           // populated by eras.py (not yet implemented)
-    "bottlenecks": []     // populated by bottlenecks.py (not yet implemented)
-  },
-  "experimental": { ...same structure }   // absent if experimental not provided
+  "nodes": { "<node_id>": { ...node }, ... },
+  "edges": [ { ...edge }, ... ],
+  "eras": { "<era>": ["<node_id>", ...], ... },
+  "bottlenecks": ["<node_id>", ...],   // top-20 by bottleneck_score
+  "quality_providers": { ... },
+  "group_providers": { ... },
+  "harvested_from": { ... },
+  "foraged_from": { ... },
+  "categories": { "<category>": ["<node_id>", ...], ... }
 }
 
-Both `stable` and `experimental` are optional individually, but at least one must be given.
+Manifest (graph-manifest.json):
+{
+  "generated_at": "<ISO-8601>",
+  "cdda_commit": "<7-char sha>",
+  "cdda_date": "<ISO-8601>",
+  "builder_version": "<version>",
+  "mods": [
+    { "id": "vanilla",   "label": "Vanilla",   "file": "graph-vanilla.json",   "default": true },
+    { "id": "innawood",  "label": "Innawood",  "file": "graph-innawood.json"  },
+    ...
+  ]
+}
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from builder.fetch import CloneResult
     from builder.graph import Graph
+    from builder.mods import ModConfig
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +55,14 @@ def _builder_version() -> str:
         return "dev"
 
 
+def _build_category_buckets(graph: "Graph") -> dict[str, list[str]]:
+    buckets: dict[str, list[str]] = {}
+    for nid, node in graph.nodes.items():
+        if node.category is not None:
+            buckets.setdefault(node.category, []).append(nid)
+    return buckets
+
+
 def _build_era_buckets(graph: "Graph") -> dict[str, list[str]]:
     buckets: dict[str, list[str]] = {}
     for nid, node in graph.nodes.items():
@@ -57,12 +72,10 @@ def _build_era_buckets(graph: "Graph") -> dict[str, list[str]]:
 
 
 def _dataset(graph: "Graph") -> dict:
-    """Serialize a single Graph into the dataset sub-object."""
+    """Serialize a Graph into the dataset object written to each graph-<mod>.json."""
     nodes = {nid: node.to_dict() for nid, node in graph.nodes.items()}
     edges = [e.to_dict() for e in graph.edges]
 
-    # Derive top-20 bottleneck list from node scores written by bottlenecks.annotate().
-    # If annotate() was never called all scores are 0 and the list stays empty.
     ranked = sorted(
         [(nid, n.bottleneck_score) for nid, n in graph.nodes.items() if n.bottleneck_score > 0],
         key=lambda x: x[1],
@@ -77,53 +90,57 @@ def _dataset(graph: "Graph") -> dict:
         "bottlenecks": bottlenecks,
         "quality_providers": graph.quality_providers,
         "group_providers": graph.group_providers,
+        "harvested_from": graph.harvested_from,
+        "foraged_from": graph.foraged_from,
+        "categories": _build_category_buckets(graph),
     }
 
 
-def emit(
+def emit_all(
+    mods: "list[tuple[ModConfig, Graph]]",
     *,
-    stable: "tuple[Graph, CloneResult] | None" = None,
-    experimental: "tuple[Graph, CloneResult] | None" = None,
+    clone: "CloneResult",
     dest: "str | Path",
 ) -> None:
     """
-    Write graph.json to *dest*.
-
-    At least one of *stable* or *experimental* must be provided.
-    *dest* may be a file path or a directory (file written as graph.json inside it).
+    Write one graph-<mod_id>.json per mod plus graph-manifest.json into *dest* directory.
     """
-    if stable is None and experimental is None:
-        raise ValueError("At least one of stable or experimental must be provided")
-
     dest = Path(dest)
-    if dest.is_dir():
-        dest = dest / "graph.json"
+    dest.mkdir(parents=True, exist_ok=True)
 
-    stable_graph, stable_meta = stable if stable is not None else (None, None)
-    exp_graph, exp_meta = experimental if experimental is not None else (None, None)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    builder_ver = _builder_version()
 
-    meta = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "cdda_stable_tag": stable_meta.tag if stable_meta else None,
-        "cdda_stable_commit": stable_meta.commit_sha[:7] if stable_meta else None,
-        "cdda_experimental_commit": exp_meta.commit_sha[:7] if exp_meta else None,
-        "cdda_experimental_date": exp_meta.commit_date if exp_meta else None,
-        "builder_version": _builder_version(),
+    manifest_mods = []
+    for i, (mod, graph) in enumerate(mods):
+        filename = f"graph-{mod.id}.json"
+        filepath = dest / filename
+
+        content = json.dumps(_dataset(graph), ensure_ascii=False, separators=(",", ":"))
+        filepath.write_text(content, encoding="utf-8")
+
+        size_kb = len(content.encode()) / 1024
+        sha = hashlib.sha256(content.encode()).hexdigest()[:12]
+        log.info("Wrote %s  (%.0f KB, sha256=%.12s)", filepath, size_kb, sha)
+
+        entry: dict = {"id": mod.id, "label": mod.label, "file": filename}
+        if i == 0:
+            entry["default"] = True
+        manifest_mods.append(entry)
+
+    manifest = {
+        "generated_at": generated_at,
+        "cdda_commit": clone.commit_sha[:7],
+        "cdda_date": clone.commit_date,
+        "builder_version": builder_ver,
+        "mods": manifest_mods,
     }
-
-    output: dict = {"meta": meta}
-    if stable_graph is not None:
-        output["stable"] = _dataset(stable_graph)
-    if exp_graph is not None:
-        output["experimental"] = _dataset(exp_graph)
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    content = json.dumps(output, ensure_ascii=False, separators=(",", ":"))
-    dest.write_text(content, encoding="utf-8")
-
-    size_kb = len(content.encode()) / 1024
-    sha = hashlib.sha256(content.encode()).hexdigest()[:12]
-    log.info("Wrote %s  (%.0f KB, sha256=%.12s)", dest, size_kb, sha)
+    manifest_path = dest / "graph-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    log.info("Wrote %s  (%d mods)", manifest_path, len(mods))
 
 
 def content_hash(path: "str | Path") -> str | None:

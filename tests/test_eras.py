@@ -165,8 +165,9 @@ def test_cycle_safety():
 
 def test_emit_includes_eras_after_annotate(tmp_path):
     import json
-    from builder.emit import emit
+    from builder.emit import emit_all
     from builder.fetch import CloneResult
+    from builder.mods import VANILLA
 
     g = _graph(
         _item("rock"), _item("knife"),
@@ -176,23 +177,26 @@ def test_emit_includes_eras_after_annotate(tmp_path):
 
     meta = CloneResult(path="/tmp", build_type="experimental",
                        tag=None, commit_sha="a"*40, commit_date="2024-01-01T00:00:00+00:00")
-    emit(experimental=(g, meta), dest=tmp_path / "graph.json")
-    data = json.loads((tmp_path / "graph.json").read_text())
-    assert "stone" in data["experimental"]["eras"]
-    assert "knife" in data["experimental"]["eras"]["stone"]
+    emit_all([(VANILLA, g)], clone=meta, dest=tmp_path)
+    fname = json.loads((tmp_path / "graph-manifest.json").read_text())["mods"][0]["file"]
+    data = json.loads((tmp_path / fname).read_text())
+    assert "stone" in data["eras"]
+    assert "knife" in data["eras"]["stone"]
 
 
 def test_emit_eras_empty_without_annotate(tmp_path):
     import json
-    from builder.emit import emit
+    from builder.emit import emit_all
     from builder.fetch import CloneResult
+    from builder.mods import VANILLA
 
     g = _graph(_item("rock"), _item("knife"), _edge("knife", "rock"))
     meta = CloneResult(path="/tmp", build_type="experimental",
                        tag=None, commit_sha="a"*40, commit_date="2024-01-01T00:00:00+00:00")
-    emit(experimental=(g, meta), dest=tmp_path / "graph.json")
-    data = json.loads((tmp_path / "graph.json").read_text())
-    assert data["experimental"]["eras"] == {}
+    emit_all([(VANILLA, g)], clone=meta, dest=tmp_path)
+    fname = json.loads((tmp_path / "graph-manifest.json").read_text())["mods"][0]["file"]
+    data = json.loads((tmp_path / fname).read_text())
+    assert data["eras"] == {}
 
 
 # ---------------------------------------------------------------------------

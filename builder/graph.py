@@ -57,6 +57,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from builder.resolve import ResolvedData
 
+from builder.categories import classify_item
+
 log = logging.getLogger(__name__)
 
 
@@ -70,6 +72,7 @@ class Node:
     type: str                                           # item | construction | disassembly | practice | quality | skill | proficiency | group
     display_name: str
     era: str | None = None                             # filled by eras.py
+    category: str | None = None                        # filled by categories.py (weapons, tools, food, …)
     learn_method: str | None = None                    # autolearn | book | practice | construction | None
     book_sources: list = dataclasses.field(default_factory=list)
     skill_requirements: list = dataclasses.field(default_factory=list)
@@ -79,6 +82,9 @@ class Node:
     spawn_class: str | None = None                     # filled by spawn.py
     incomplete: bool = False
     pseudo: bool = False
+    description: str | None = None
+    mod_source: str | None = None                        # e.g. "innawood" | None (vanilla)
+    innawood_obsolete: bool = False                      # True when Innawood marks the vanilla recipe obsolete
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -111,6 +117,8 @@ class Graph:
     edges: list[Edge]
     quality_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     group_providers: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    harvested_from: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    foraged_from: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -148,10 +156,18 @@ def build(resolved: "ResolvedData") -> Graph:
         # Sort: autolearn first, then book, then others; stable sort preserves file order
         result_recipes.sort(key=_recipe_priority)
 
-        # Primary recipe → populate the item node's metadata
-        _populate_node_from_recipe(nodes[result_id], result_recipes[0][1])
+        # Filter out Innawood-obsoleted recipes and flag the node.
+        active_recipes = [(k, r) for k, r in result_recipes if not r.get("obsolete")]
+        if len(active_recipes) < len(result_recipes):
+            nodes[result_id].innawood_obsolete = True
 
-        for i, (recipe_key, recipe) in enumerate(result_recipes):
+        if not active_recipes:
+            continue
+
+        # Primary recipe → populate the item node's metadata
+        _populate_node_from_recipe(nodes[result_id], active_recipes[0][1])
+
+        for i, (recipe_key, recipe) in enumerate(active_recipes):
             is_primary = (i == 0)
             inlined = _inline_using(recipe, resolved.requirements)
             recipe_edges = _craft_edges(result_id, recipe_key, inlined, is_primary, nodes, resolved)
@@ -194,13 +210,6 @@ def build(resolved: "ResolvedData") -> Graph:
         inlined = _inline_using(prac, resolved.requirements)
         edges.extend(_craft_edges(prac_id, prac_id, inlined, True, nodes, resolved))
 
-    # --- Reclassify virtual tool stubs ---
-    # Incomplete item stubs that are ONLY ever used as non-consumed tool requirements
-    # (qty=-1) are CDDA pseudo-items like surface_heat / fire that have a type our
-    # loader skips (e.g. "TOOL" in legacy data). Treat them as group nodes so they
-    # render as green virtual-requirement nodes instead of blue incomplete item stubs.
-    _reclassify_virtual_tool_nodes(nodes, edges)
-
     # --- Quality providers ---
     # Scan all items for their "qualities" field and build a reverse map:
     # qual_node_id → sorted list of item IDs that provide that quality at that level or higher.
@@ -237,17 +246,86 @@ def build(resolved: "ResolvedData") -> Graph:
             quality_providers[node_id] = sorted(set(providers))
 
     # --- Group providers ---
+    # A group node comes from either a CDDA item_group or a LIST requirement;
+    # flatten whichever source applies into its member/provider item IDs.
     group_providers: dict[str, list[str]] = {}
     for node_id, node in nodes.items():
         if node.type != "group":
             continue
-        members = _flatten_group_members(node_id, resolved.item_groups)
+        if node_id in resolved.item_groups:
+            members = _flatten_group_members(node_id, resolved.item_groups)
+        elif node_id in resolved.requirements:
+            members = _flatten_requirement_providers(node_id, resolved.requirements)
+        else:
+            members = []
         # Only include members that exist as actual items (skip nested groups / unknowns)
         known = [m for m in members if m in resolved.items]
         if known:
             group_providers[node_id] = known
 
-    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers, group_providers=group_providers)
+    # --- Harvested-from index ---
+    # Maps item_id → deduplicated sorted list of monster display names that drop it
+    harvested_from: dict[str, list[str]] = {}
+    for _mon_id, monster in resolved.monsters.items():
+        harvest_ref = monster.get("harvest")
+        if not harvest_ref:
+            continue
+        table_ids = [harvest_ref] if isinstance(harvest_ref, str) else list(harvest_ref)
+        mon_name = _display_name(monster)
+        for table_id in table_ids:
+            table = resolved.harvests.get(table_id)
+            if not table:
+                continue
+            for entry in table.get("entries", []):
+                if not isinstance(entry, dict):
+                    continue
+                drop = entry.get("drop")
+                if drop and isinstance(drop, str):
+                    bucket = harvested_from.setdefault(drop, [])
+                    if mon_name not in bucket:
+                        bucket.append(mon_name)
+    for bucket in harvested_from.values():
+        bucket.sort()
+
+    # --- Foraged-from index ---
+    # Maps item_id → deduplicated sorted list of terrain/furniture display names
+    # that yield it via harvest_by_season interactions.
+    foraged_from: dict[str, list[str]] = {}
+    all_terrain_furn: dict[str, dict] = {**resolved.terrains, **resolved.furnitures}
+    terrain_sources = list(resolved.terrains.values()) + list(resolved.furnitures.values())
+    for source in terrain_sources:
+        for season_entry in source.get("harvest_by_season", []):
+            table_id = season_entry.get("id")
+            if not table_id:
+                continue
+            table = resolved.harvests.get(table_id)
+            if not table:
+                continue
+            # Resolve display name: fall back one level of copy-from when name is null
+            if source.get("name") is None and source.get("copy-from"):
+                parent = all_terrain_furn.get(source["copy-from"])
+                source_name = _display_name(parent) if parent else _display_name(source)
+            else:
+                source_name = _display_name(source)
+            for entry in table.get("entries", []):
+                if not isinstance(entry, dict):
+                    continue
+                drop = entry.get("drop")
+                if drop and isinstance(drop, str):
+                    bucket = foraged_from.setdefault(drop, [])
+                    if source_name not in bucket:
+                        bucket.append(source_name)
+    for bucket in foraged_from.values():
+        bucket.sort()
+
+    # Tag forageable items that have no recipe as environment_gather
+    for item_id, node in nodes.items():
+        if item_id in foraged_from and node.learn_method is None:
+            node.spawn_class = "environment_gather"
+
+    return Graph(nodes=nodes, edges=edges, quality_providers=quality_providers,
+                 group_providers=group_providers, harvested_from=harvested_from,
+                 foraged_from=foraged_from)
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +339,9 @@ def _make_item_node(item_id: str, item: dict) -> Node:
         type="item",
         display_name=_display_name(item),
         pseudo="PSEUDO" in flags,
+        description=_description_text(item),
+        mod_source=item.get("_mod") or None,
+        category=classify_item(item),
     )
 
 
@@ -271,6 +352,7 @@ def _make_construction_node(con_id: str, con: dict) -> Node:
         {"skill": s, "level": lvl}
         for s, lvl in con.get("required_skills", [])
     ]
+    desc = _description_text(con) or con.get("pre_note") or None
     return Node(
         id=con_id,
         type="construction",
@@ -278,6 +360,8 @@ def _make_construction_node(con_id: str, con: dict) -> Node:
         learn_method="construction",
         skill_requirements=skill_reqs,
         craft_time=con.get("time"),
+        description=desc,
+        mod_source=con.get("_mod") or None,
     )
 
 
@@ -291,6 +375,8 @@ def _make_practice_node(prac_id: str, prac: dict) -> Node:
         learn_method="practice",
         skill_requirements=skill_reqs,
         craft_time=prac.get("time"),
+        description=_description_text(prac),
+        mod_source=prac.get("_mod") or None,
     )
 
 
@@ -304,8 +390,14 @@ def _populate_node_from_recipe(node: Node, recipe: dict) -> None:
         if isinstance(p, dict) and p.get("required", False)
     ]
     node.craft_time = recipe.get("time")
+    # Use recipe description as fallback when the item has no description of its own
+    if not node.description:
+        node.description = _description_text(recipe)
     # Having a recipe means the item is defined well enough to present; clear stub flag.
     node.incomplete = False
+    # Prefer recipe mod source over item mod source (recipe is what changed)
+    if recipe.get("_mod"):
+        node.mod_source = recipe["_mod"]
 
 
 # ---------------------------------------------------------------------------
@@ -330,10 +422,9 @@ def _craft_edges(
     # Component edges — three-level list: [slot[alternative[item_id, qty, ?qualifier]]]
     for slot in recipe.get("components", []):
         for alt_idx, entry in enumerate(slot):
-            item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
+            target_id, qty = _resolve_dep_target(entry, nodes, resolved, recipe_key)
             edges.append(Edge(
-                from_node=from_node, to_node=item_id,
+                from_node=from_node, to_node=target_id,
                 type="requires_component",
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
@@ -345,10 +436,9 @@ def _craft_edges(
     # Specific tool edges — same list structure; qty=-1 means not consumed
     for slot in recipe.get("tools", []):
         for alt_idx, entry in enumerate(slot):
-            item_id, qty = entry[0], entry[1]
-            _ensure_item_node(item_id, resolved.items, nodes, source=recipe_key, item_groups=resolved.item_groups)
+            target_id, qty = _resolve_dep_target(entry, nodes, resolved, recipe_key)
             edges.append(Edge(
-                from_node=from_node, to_node=item_id,
+                from_node=from_node, to_node=target_id,
                 type="requires_component",
                 quantity=qty,
                 is_default=(is_primary and alt_idx == 0),
@@ -502,36 +592,92 @@ def _inline_using(obj: dict, requirements: dict[str, dict], _depth: int = 0) -> 
 
 
 # ---------------------------------------------------------------------------
-# Post-processing helpers
-# ---------------------------------------------------------------------------
-
-def _reclassify_virtual_tool_nodes(nodes: dict[str, Node], edges: list[Edge]) -> None:
-    """
-    Incomplete stubs that appear ONLY as non-consumed tool requirements (qty=-1)
-    are virtual CDDA pseudo-items (surface_heat, fire, etc.) whose type our loader
-    skips because they use legacy CDDA type strings like "TOOL".  Re-type them as
-    "group" so they render as green virtual-requirement nodes.
-    """
-    # Collect all quantities at which each node is referenced as a component
-    qty_by_node: dict[str, set[int]] = {}
-    for edge in edges:
-        if edge.type == "requires_component":
-            qty_by_node.setdefault(edge.to_node, set()).add(edge.quantity)
-
-    for node_id, qtys in qty_by_node.items():
-        node = nodes.get(node_id)
-        if node and node.incomplete and qtys == {-1}:
-            # Exclusively a non-consumed tool — virtual requirement
-            node.type = "group"
-            # Stub display_name is the raw id; make it human-readable
-            node.display_name = node_id.replace("_", " ").title()
-            node.incomplete = False
-            log.info("Reclassified virtual tool stub %r as group node", node_id)
-
-
-# ---------------------------------------------------------------------------
 # Node-ensure helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_dep_target(
+    entry: "str | list",
+    nodes: dict[str, Node],
+    resolved: "ResolvedData",
+    recipe_key: str,
+) -> tuple[str, int]:
+    """
+    Resolve a single component/tool entry to (target_node_id, quantity), creating
+    the appropriate node.
+
+    CDDA uses several formats for entries:
+      "item_id"              — bare string (practice tools list alternatives)
+      ["item_id"]            — single-element list (no qty, assume -1 not consumed)
+      ["item_id", qty]       — standard form
+      ["item_id", qty, "LIST"] — LIST qualifier: id is a requirement object, not an item
+
+    When the qualifier is ``"LIST"`` the id refers to a CDDA *requirement* object
+    (e.g. ``surface_heat``, ``adhesive``) — rendered as a green ``group`` node.
+    """
+    if isinstance(entry, str):
+        dep_id, qty = entry, -1
+    elif len(entry) < 2:
+        dep_id, qty = entry[0], -1
+    else:
+        dep_id, qty = entry[0], entry[1]
+
+    is_list = isinstance(entry, list) and len(entry) >= 3 and entry[2] == "LIST"
+    if is_list and dep_id in resolved.requirements:
+        _ensure_requirement_group_node(dep_id, resolved.requirements, nodes)
+    else:
+        _ensure_item_node(
+            dep_id, resolved.items, nodes,
+            source=recipe_key, item_groups=resolved.item_groups,
+        )
+    return dep_id, qty
+
+
+def _ensure_requirement_group_node(
+    req_id: str,
+    requirements: dict,
+    nodes: dict[str, Node],
+) -> None:
+    """Create (or upgrade a stub into) a green group node for a LIST requirement."""
+    existing = nodes.get(req_id)
+    if existing is not None and not existing.incomplete:
+        return
+    req = requirements.get(req_id, {})
+    display = _display_name(req) if req else req_id
+    nodes[req_id] = Node(id=req_id, type="group", display_name=display)
+
+
+def _flatten_requirement_providers(
+    req_id: str,
+    requirements: dict,
+    _seen: set | None = None,
+) -> list[str]:
+    """
+    Flatten a requirement's components + tools into the list of item IDs that can
+    satisfy it.  Nested LIST references to other requirements are expanded
+    recursively (cycle-safe).
+    """
+    if _seen is None:
+        _seen = set()
+    if req_id in _seen:
+        return []
+    _seen.add(req_id)
+
+    req = requirements.get(req_id, {})
+    providers: list[str] = []
+    for field in ("components", "tools"):
+        for slot in req.get(field, []) or []:
+            if not isinstance(slot, list):
+                continue
+            for entry in slot:
+                if not (isinstance(entry, list) and entry):
+                    continue
+                sub_id = str(entry[0])
+                if len(entry) >= 3 and entry[2] == "LIST":
+                    providers.extend(_flatten_requirement_providers(sub_id, requirements, _seen))
+                else:
+                    providers.append(sub_id)
+    return list(dict.fromkeys(providers))
+
 
 def _ensure_item_node(
     item_id: str,
@@ -633,6 +779,17 @@ def _ensure_proficiency_node(prof_id: str, node_id: str, nodes: dict[str, Node])
 
 def _quality_node_id(qual_id: str, level: int) -> str:
     return f"qual_{qual_id}_{level}"
+
+
+def _description_text(obj: dict) -> str | None:
+    desc = obj.get("description")
+    if desc is None:
+        return None
+    if isinstance(desc, str):
+        return desc
+    if isinstance(desc, dict):
+        return desc.get("str") or desc.get("str_sp") or None
+    return None
 
 
 def _display_name(obj: dict) -> str:

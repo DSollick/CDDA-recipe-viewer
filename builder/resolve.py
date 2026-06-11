@@ -8,7 +8,7 @@ Two-phase approach:
     (Kahn's algorithm). Each object ends up fully self-contained with no copy-from.
 
   Phase 2 — Innawood layer application
-    load.py keeps Innawood objects in data.innawood_additions rather than merging them
+    load.py keeps Innawood objects in data.mod_additions rather than merging them
     into the vanilla buckets, avoiding self-referential copy-from cycles (a common
     CDDA pattern where a mod patches a vanilla entity using copy-from: <same_id>).
     The three cases handled:
@@ -39,6 +39,8 @@ import dataclasses
 import logging
 from typing import TYPE_CHECKING
 
+from builder.load import ITEM_TYPES
+
 if TYPE_CHECKING:
     from builder.load import LoadedData
 
@@ -65,19 +67,17 @@ class ResolvedData:
     requirements: dict[str, dict]
     tool_qualities: dict[str, dict]
     item_groups: dict[str, dict]
+    harvests: dict[str, dict]
+    monsters: dict[str, dict]
+    terrains: dict[str, dict]        # raw terrain objects (only id/name/harvest_by_season used)
+    furnitures: dict[str, dict]      # raw furniture objects (only id/name/harvest_by_season used)
     blacklists: list[dict]
-    innawood_additions: dict[str, list[dict]]
+    mod_additions: dict[str, list[dict]]
     unresolved_count: int            # copy-from targets that could not be found
 
 
-def resolve(data: "LoadedData") -> ResolvedData:
-    """
-    Phase 1: resolve vanilla copy-from chains.
-    Phase 2: apply Innawood mod layer on top of resolved vanilla.
-    """
-    inn = data.innawood_additions
-
-    # --- Phase 1: vanilla resolution ---
+def resolve_vanilla(data: "LoadedData") -> ResolvedData:
+    """Phase 1 only: resolve vanilla copy-from chains with no mod layer applied."""
     items_res,   items_unres  = _resolve_bucket(data.items,          "items")
     recipes_res, rcp_unres    = _resolve_bucket(data.recipes,        "recipes")
     uncraft_res, unc_unres    = _resolve_bucket(data.uncrafts,       "uncrafts")
@@ -86,23 +86,14 @@ def resolve(data: "LoadedData") -> ResolvedData:
     req_res,     req_unres    = _resolve_bucket(data.requirements,    "requirements")
     tq_res,      tq_unres     = _resolve_bucket(data.tool_qualities,  "tool_qualities")
     ig_res,      ig_unres     = _resolve_bucket(data.item_groups,     "item_groups")
-
-    # --- Phase 2: Innawood layer ---
-    items_res,   inn_items_u  = _apply_mod_layer(items_res,   inn.get("ITEM", []),         "items",         _item_key)
-    recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key)
-    uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key)
-    constr_res,  inn_con_u    = _apply_mod_layer(constr_res,  inn.get("construction", []), "constructions", _id_key)
-    prac_res,    inn_prac_u   = _apply_mod_layer(prac_res,    inn.get("practice", []),     "practice",      _recipe_result_key)
-    req_res,     inn_req_u    = _apply_mod_layer(req_res,     inn.get("requirement", []),  "requirements",  _id_key)
-    tq_res,      inn_tq_u     = _apply_mod_layer(tq_res,      inn.get("tool_quality", []), "tool_qualities", _id_key)
-    ig_res,      inn_ig_u     = _apply_mod_layer(ig_res,      inn.get("item_group", []),   "item_groups",   _id_key)
+    harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
+    mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
 
     total_unresolved = (items_unres + rcp_unres + unc_unres + con_unres + prac_unres +
-                        req_unres + tq_unres + ig_unres + inn_items_u + inn_rcp_u +
-                        inn_unc_u + inn_con_u + inn_prac_u + inn_req_u + inn_tq_u + inn_ig_u)
+                        req_unres + tq_unres + ig_unres + harv_unres + mon_unres)
 
-    abstracts = {k: v for k, v in items_res.items() if "abstract" in v}
-    items_concrete = {k: v for k, v in items_res.items() if "abstract" not in v}
+    abstracts = {k: v for k, v in items_res.items() if "id" not in v}
+    items_concrete = {k: v for k, v in items_res.items() if "id" in v}
 
     return ResolvedData(
         items=items_concrete,
@@ -114,10 +105,79 @@ def resolve(data: "LoadedData") -> ResolvedData:
         requirements=req_res,
         tool_qualities=tq_res,
         item_groups=ig_res,
+        harvests=harv_res,
+        monsters=mon_res,
+        terrains=data.terrains,
+        furnitures=data.furnitures,
         blacklists=data.blacklists,
-        innawood_additions=data.innawood_additions,
+        mod_additions=data.mod_additions,
         unresolved_count=total_unresolved,
     )
+
+
+def resolve_with_mod(data: "LoadedData", mod_name: str = "mod") -> ResolvedData:
+    """
+    Phase 1: resolve vanilla copy-from chains.
+    Phase 2: apply mod layer on top, tagging new items with *mod_name*.
+    """
+    inn = data.mod_additions
+
+    items_res,   items_unres  = _resolve_bucket(data.items,          "items")
+    recipes_res, rcp_unres    = _resolve_bucket(data.recipes,        "recipes")
+    uncraft_res, unc_unres    = _resolve_bucket(data.uncrafts,       "uncrafts")
+    constr_res,  con_unres    = _resolve_bucket(data.constructions,   "constructions")
+    prac_res,    prac_unres   = _resolve_bucket(data.practice,        "practice")
+    req_res,     req_unres    = _resolve_bucket(data.requirements,    "requirements")
+    tq_res,      tq_unres     = _resolve_bucket(data.tool_qualities,  "tool_qualities")
+    ig_res,      ig_unres     = _resolve_bucket(data.item_groups,     "item_groups")
+    harv_res,    harv_unres   = _resolve_bucket(data.harvests,        "harvests")
+    mon_res,     mon_unres    = _resolve_bucket(data.monsters,        "monsters")
+
+    # Collect mod items from all accepted item type names (modern "ITEM" + legacy types).
+    mod_items: list[dict] = []
+    for _t in ITEM_TYPES:
+        mod_items.extend(inn.get(_t, []))
+    items_res,   inn_items_u  = _apply_mod_layer(items_res,   mod_items,                   "items",         _item_key,             mod_name)
+    recipes_res, inn_rcp_u    = _apply_mod_layer(recipes_res, inn.get("recipe", []),       "recipes",       _recipe_result_key,    mod_name)
+    uncraft_res, inn_unc_u    = _apply_mod_layer(uncraft_res, inn.get("uncraft", []),      "uncrafts",      _recipe_result_key,    mod_name)
+    constr_res,  inn_con_u    = _apply_mod_layer(constr_res,  inn.get("construction", []), "constructions", _id_key,               mod_name)
+    prac_res,    inn_prac_u   = _apply_mod_layer(prac_res,    inn.get("practice", []),     "practice",      _recipe_result_key,    mod_name)
+    req_res,     inn_req_u    = _apply_mod_layer(req_res,     inn.get("requirement", []),  "requirements",  _id_key,               mod_name)
+    tq_res,      inn_tq_u     = _apply_mod_layer(tq_res,      inn.get("tool_quality", []), "tool_qualities", _id_key,              mod_name)
+    ig_res,      inn_ig_u     = _apply_mod_layer(ig_res,      inn.get("item_group", []),   "item_groups",   _id_key,               mod_name)
+    harv_res,    inn_harv_u   = _apply_mod_layer(harv_res,    inn.get("harvest", []),      "harvests",      _id_key,               mod_name)
+    mon_res,     inn_mon_u    = _apply_mod_layer(mon_res,     inn.get("MONSTER", []),      "monsters",      _id_key,               mod_name)
+
+    total_unresolved = (items_unres + rcp_unres + unc_unres + con_unres + prac_unres +
+                        req_unres + tq_unres + ig_unres + harv_unres + mon_unres +
+                        inn_items_u + inn_rcp_u + inn_unc_u + inn_con_u + inn_prac_u +
+                        inn_req_u + inn_tq_u + inn_ig_u + inn_harv_u + inn_mon_u)
+
+    abstracts = {k: v for k, v in items_res.items() if "id" not in v}
+    items_concrete = {k: v for k, v in items_res.items() if "id" in v}
+
+    return ResolvedData(
+        items=items_concrete,
+        abstracts=abstracts,
+        recipes=recipes_res,
+        uncrafts=uncraft_res,
+        constructions=constr_res,
+        practice=prac_res,
+        requirements=req_res,
+        tool_qualities=tq_res,
+        item_groups=ig_res,
+        harvests=harv_res,
+        monsters=mon_res,
+        terrains=data.terrains,
+        furnitures=data.furnitures,
+        blacklists=data.blacklists,
+        mod_additions=data.mod_additions,
+        unresolved_count=total_unresolved,
+    )
+
+
+# Keep the old name as an alias so existing callers (tests etc.) don't break immediately.
+resolve = resolve_with_mod
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +340,7 @@ def _apply_mod_layer(
     mod_objects: list[dict],
     label: str,
     key_fn: "callable[[dict], str | None]",
+    mod_name: str = "innawood",
 ) -> tuple[dict[str, dict], int]:
     """
     Overlay a list of mod objects onto an already-resolved vanilla bucket.
@@ -298,6 +359,13 @@ def _apply_mod_layer(
             continue
 
         parent_id = obj.get("copy-from")
+        # Only tag as mod-sourced if this key doesn't exist in vanilla.
+        # Patches onto existing vanilla entities (case a) and new items that
+        # inherit from vanilla parents (case b, key already present) are vanilla
+        # items with mod tweaks, not mod-exclusive additions.
+        is_new = key not in resolved
+        if is_new:
+            obj = {**obj, "_mod": mod_name}
 
         if parent_id is None:
             # Case c: complete definition — replaces or adds with no inheritance

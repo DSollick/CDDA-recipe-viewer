@@ -1,8 +1,14 @@
 import React from 'react';
 import { GraphNode } from '../types';
+import { getModPalette } from '../modColors';
 
 interface NodeDetailProps {
   node: GraphNode;
+  providers?: string[];
+  nodes?: Record<string, GraphNode>;
+  onSelectItem?: (id: string) => void;
+  harvestedFrom?: string[];
+  foragedFrom?: string[];
 }
 
 const TYPE_COLORS: Record<GraphNode['type'], string> = {
@@ -26,7 +32,7 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
   return <span className={`inline-block text-xs rounded px-2 py-0.5 ${className}`}>{children}</span>;
 }
 
-export default function NodeDetail({ node }: NodeDetailProps) {
+export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom }: NodeDetailProps) {
   const typeColor = TYPE_COLORS[node.type] ?? 'bg-slate-700 text-slate-300';
   const learnColor = node.learn_method
     ? (LEARN_METHOD_COLORS[node.learn_method] ?? 'bg-slate-700 text-slate-300')
@@ -48,9 +54,16 @@ export default function NodeDetail({ node }: NodeDetailProps) {
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
+        {node.mod_source && <Badge className={getModPalette(node.mod_source).badge}>{node.mod_source}</Badge>}
         {node.pseudo && <Badge className="bg-violet-900 text-violet-300">pseudo</Badge>}
         {node.incomplete && <Badge className="bg-red-900 text-red-300">incomplete</Badge>}
+        {node.innawood_obsolete && <Badge className="bg-orange-900 text-orange-300">no recipe in innawood</Badge>}
       </div>
+
+      {/* Description */}
+      {node.description && (
+        <p className="text-slate-400 text-sm italic leading-relaxed">{node.description}</p>
+      )}
 
       {/* Craft time */}
       {node.craft_time && (
@@ -99,17 +112,31 @@ export default function NodeDetail({ node }: NodeDetailProps) {
 
       {/* Book sources */}
       {node.book_sources.length > 0 && (
-        <DetailRow label="Book sources">
+        <DetailRow label={node.learn_method === 'autolearn' ? 'Also in books' : 'Book sources'}>
           <ul className="space-y-0.5">
             {(node.book_sources as Array<{ book: string; skill_level?: number } | string>).map(
-              (bs, i) => (
-                <li key={i} className="text-slate-300 text-sm">
-                  {typeof bs === 'string' ? bs : bs.book}
-                  {typeof bs !== 'string' && bs.skill_level !== undefined && (
-                    <span className="text-slate-500 ml-1">lvl {bs.skill_level}</span>
-                  )}
-                </li>
-              )
+              (bs, i) => {
+                const bookId = typeof bs === 'string' ? bs : bs.book;
+                const skillLevel = typeof bs !== 'string' ? bs.skill_level : undefined;
+                const bookNode = nodes?.[bookId];
+                return (
+                  <li key={i} className="text-sm flex items-baseline gap-1">
+                    {onSelectItem ? (
+                      <button
+                        onClick={() => onSelectItem(bookId)}
+                        className="text-left text-blue-300 hover:text-blue-100 hover:underline"
+                      >
+                        {bookNode?.display_name ?? bookId}
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">{bookNode?.display_name ?? bookId}</span>
+                    )}
+                    {skillLevel !== undefined && (
+                      <span className="text-slate-500">lvl {skillLevel}</span>
+                    )}
+                  </li>
+                );
+              }
             )}
           </ul>
         </DetailRow>
@@ -119,6 +146,53 @@ export default function NodeDetail({ node }: NodeDetailProps) {
       {node.spawn_class && (
         <DetailRow label="Spawn class">
           <span className="text-slate-300 font-mono text-sm">{node.spawn_class}</span>
+        </DetailRow>
+      )}
+
+      {/* Foraged from */}
+      {foragedFrom && foragedFrom.length > 0 && (
+        <DetailRow label="Foraged from">
+          <ul className="space-y-0.5 max-h-48 overflow-y-auto">
+            {foragedFrom.map((name) => (
+              <li key={name} className="text-green-300 text-sm">{name}</li>
+            ))}
+          </ul>
+        </DetailRow>
+      )}
+
+      {/* Harvested from */}
+      {harvestedFrom && harvestedFrom.length > 0 && (
+        <DetailRow label="Harvested from">
+          <ul className="space-y-0.5 max-h-48 overflow-y-auto">
+            {harvestedFrom.map((name) => (
+              <li key={name} className="text-slate-300 text-sm">{name}</li>
+            ))}
+          </ul>
+        </DetailRow>
+      )}
+
+      {/* Providers — for group and quality nodes */}
+      {providers && providers.length > 0 && (
+        <DetailRow label={node.type === 'group' ? 'Items that satisfy this' : 'Items providing this'}>
+          <ul className="space-y-0.5 max-h-64 overflow-y-auto">
+            {providers.map((id) => {
+              const n = nodes?.[id];
+              return (
+                <li key={id}>
+                  {onSelectItem ? (
+                    <button
+                      onClick={() => onSelectItem(id)}
+                      className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                    >
+                      {n?.display_name ?? id}
+                    </button>
+                  ) : (
+                    <span className="text-slate-300 text-sm">{n?.display_name ?? id}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </DetailRow>
       )}
     </div>

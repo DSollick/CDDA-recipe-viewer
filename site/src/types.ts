@@ -12,6 +12,10 @@ export interface GraphNode {
   spawn_class: string | null;
   incomplete: boolean;
   pseudo: boolean;
+  description?: string | null;
+  mod_source?: string | null;
+  category?: string | null;
+  innawood_obsolete?: boolean;
 }
 
 export interface GraphEdge {
@@ -30,32 +34,35 @@ export interface GraphEdge {
   slot_index: number | null;
 }
 
+// The dataset object fetched from graph-<mod_id>.json
 export interface Dataset {
   nodes: Record<string, GraphNode>;
   edges: GraphEdge[];
-  eras: Record<string, string[]>; // era_name → [node_id, ...]
-  bottlenecks: string[]; // top-20 node IDs by bottleneck_score
-  quality_providers: Record<string, string[]>; // qual_node_id → item IDs that satisfy it
-  group_providers: Record<string, string[]>;   // group_id → member item IDs
+  eras: Record<string, string[]>;
+  bottlenecks: string[];
+  quality_providers: Record<string, string[]>;
+  group_providers: Record<string, string[]>;
+  harvested_from?: Record<string, string[]>;
+  foraged_from?: Record<string, string[]>;
+  categories?: Record<string, string[]>;
 }
 
-export interface GraphMeta {
+export interface ModEntry {
+  id: string;
+  label: string;
+  file: string;
+  default?: boolean;
+}
+
+export interface GraphManifest {
   generated_at: string;
-  cdda_stable_tag: string | null;
-  cdda_stable_commit: string | null;
-  cdda_experimental_commit: string | null;
-  cdda_experimental_date: string | null;
+  cdda_commit: string | null;
+  cdda_date: string | null;
   builder_version: string;
+  mods: ModEntry[];
 }
 
-export interface GraphData {
-  meta: GraphMeta;
-  stable?: Dataset;
-  experimental?: Dataset;
-}
-
-export type ViewMode = 'era' | 'tree' | 'graph' | 'bottlenecks';
-export type DatasetKey = 'stable' | 'experimental';
+export type ViewMode = 'browse' | 'tree' | 'graph' | 'bottlenecks';
 
 // Adjacency index built from edges
 export interface GraphIndex {

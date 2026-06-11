@@ -240,8 +240,9 @@ def test_annotate_no_deps_returns_empty():
 
 def test_emit_includes_bottlenecks_after_annotate(tmp_path):
     import json
-    from builder.emit import emit
+    from builder.emit import emit_all
     from builder.fetch import CloneResult
+    from builder.mods import VANILLA
 
     g = _graph(
         _item("a"), _item("b"), _item("c"),
@@ -254,26 +255,27 @@ def test_emit_includes_bottlenecks_after_annotate(tmp_path):
         path="/tmp/fake", build_type="experimental",
         tag=None, commit_sha="a" * 40, commit_date="2024-01-01T00:00:00+00:00",
     )
-    dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    assert "c" in data["experimental"]["bottlenecks"]
+    emit_all([(VANILLA, g)], clone=meta, dest=tmp_path)
+    fname = json.loads((tmp_path / "graph-manifest.json").read_text())["mods"][0]["file"]
+    data = json.loads((tmp_path / fname).read_text())
+    assert "c" in data["bottlenecks"]
 
 
 def test_emit_bottlenecks_empty_without_annotate(tmp_path):
     import json
-    from builder.emit import emit
+    from builder.emit import emit_all
     from builder.fetch import CloneResult
+    from builder.mods import VANILLA
 
     g = _graph(_item("a"), _item("b"), _item("c"), _edge("a", "c"), _edge("b", "c"))
     meta = CloneResult(
         path="/tmp/fake", build_type="experimental",
         tag=None, commit_sha="a" * 40, commit_date="2024-01-01T00:00:00+00:00",
     )
-    dest = tmp_path / "graph.json"
-    emit(experimental=(g, meta), dest=dest)
-    data = json.loads(dest.read_text())
-    assert data["experimental"]["bottlenecks"] == []
+    emit_all([(VANILLA, g)], clone=meta, dest=tmp_path)
+    fname = json.loads((tmp_path / "graph-manifest.json").read_text())["mods"][0]["file"]
+    data = json.loads((tmp_path / fname).read_text())
+    assert data["bottlenecks"] == []
 
 
 # ---------------------------------------------------------------------------

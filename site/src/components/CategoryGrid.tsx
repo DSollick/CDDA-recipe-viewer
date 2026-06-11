@@ -1,14 +1,12 @@
 import React from 'react';
 import { Dataset, GraphNode } from '../types';
+import { getModPalette } from '../modColors';
 
-interface EraGridProps {
-  era: string | null;
-  activeDataset: Dataset | null;
-  nullEraNodeIds: string[];
-  harvestedFrom?: Record<string, string[]>;
-  preferCraftable: boolean;
-  onSelectItem: (nodeId: string) => void;
-}
+const CATEGORY_LABELS: Record<string, string> = {
+  weapons: 'Weapons', ammo: 'Ammo', armor: 'Armor', tools: 'Tools',
+  food: 'Food', medicine: 'Medicine', books: 'Books', materials: 'Materials',
+  bionics: 'Bionics', vehicle_parts: 'Vehicle Parts',
+};
 
 const LEARN_METHOD_COLORS: Record<string, string> = {
   autolearn: 'bg-green-800 text-green-200',
@@ -16,60 +14,56 @@ const LEARN_METHOD_COLORS: Record<string, string> = {
   practice: 'bg-yellow-800 text-yellow-200',
 };
 
-function sourcePriority(node: GraphNode, harvestedFrom?: Record<string, string[]>): number {
+function sourcePriority(node: GraphNode): number {
   if (node.learn_method !== null) return 0;
-  if (harvestedFrom?.[node.id]?.length) return 1;
+  if (node.spawn_class !== null) return 1;
   return 2;
 }
 
-export default function EraGrid({ era, activeDataset, nullEraNodeIds, harvestedFrom, preferCraftable, onSelectItem }: EraGridProps) {
+interface CategoryGridProps {
+  category: string | null;
+  activeDataset: Dataset | null;
+  preferCraftable: boolean;
+  showModOnly: boolean;
+  onSelectItem: (nodeId: string) => void;
+}
 
+export default function CategoryGrid({ category, activeDataset, preferCraftable, showModOnly, onSelectItem }: CategoryGridProps) {
   if (!activeDataset) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-        No dataset loaded.
-      </div>
-    );
+    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">No dataset loaded.</div>;
   }
 
-  if (era === null) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-        Select an era from the sidebar to browse items.
-      </div>
-    );
+  if (category === null) {
+    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Select a category from the sidebar to browse items.</div>;
   }
 
-  let nodeIds: string[];
-  if (era === '__uncategorized__') {
-    nodeIds = nullEraNodeIds;
-  } else {
-    nodeIds = activeDataset.eras[era] ?? [];
-  }
-
+  const nodeIds = activeDataset.categories?.[category] ?? [];
   const items: GraphNode[] = nodeIds
     .map((id) => activeDataset.nodes[id])
-    .filter((n): n is GraphNode => n !== undefined && n.type === 'item');
+    .filter((n): n is GraphNode => {
+      if (!n || n.type !== 'item') return false;
+      if (showModOnly && !n.mod_source) return false;
+      return true;
+    });
 
   items.sort((a, b) => {
     if (preferCraftable) {
-      const diff = sourcePriority(a, harvestedFrom) - sourcePriority(b, harvestedFrom);
+      const diff = sourcePriority(a) - sourcePriority(b);
       if (diff !== 0) return diff;
     }
     return a.display_name.localeCompare(b.display_name);
   });
 
-  const eraLabel = era === '__uncategorized__' ? 'Uncategorized' : era;
+  const label = CATEGORY_LABELS[category] ?? category;
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <h2 className="text-lg font-semibold text-slate-200 mb-4 capitalize">
-        {eraLabel}
+      <h2 className="text-lg font-semibold text-slate-200 mb-4">
+        {label}
         <span className="ml-2 text-sm font-normal text-slate-500">{items.length} items</span>
       </h2>
-
       {items.length === 0 ? (
-        <div className="text-slate-500 text-sm">No items in this era.</div>
+        <div className="text-slate-500 text-sm">No items in this category.</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {items.map((node) => (
@@ -93,17 +87,20 @@ function ItemCard({ node, onSelect }: { node: GraphNode; onSelect: (id: string) 
         {node.display_name}
       </div>
       <div className="flex flex-wrap gap-1 mt-auto">
-        {node.era && (
-          <Badge className="bg-slate-700 text-slate-400">{node.era}</Badge>
-        )}
-        {!node.era && (
-          <Badge className="bg-slate-700 text-slate-500">uncategorized</Badge>
-        )}
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
+        {!node.learn_method && node.spawn_class && (
+          <Badge className="bg-slate-700 text-slate-400">{node.spawn_class}</Badge>
+        )}
         {node.incomplete && (
           <Badge className="bg-red-900 text-red-300">incomplete</Badge>
+        )}
+        {node.mod_source && (
+          <Badge className={getModPalette(node.mod_source).badge}>{node.mod_source}</Badge>
+        )}
+        {node.innawood_obsolete && (
+          <Badge className="bg-orange-900 text-orange-300">no recipe in innawood</Badge>
         )}
       </div>
       {node.craft_time && (
@@ -114,7 +111,5 @@ function ItemCard({ node, onSelect }: { node: GraphNode; onSelect: (id: string) 
 }
 
 function Badge({ children, className }: { children: React.ReactNode; className: string }) {
-  return (
-    <span className={`text-xs rounded px-1.5 py-0.5 ${className}`}>{children}</span>
-  );
+  return <span className={`text-xs rounded px-1.5 py-0.5 ${className}`}>{children}</span>;
 }
