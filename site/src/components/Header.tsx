@@ -13,8 +13,6 @@ interface HeaderProps {
   setActiveModId: (id: string) => void;
   activeDataset: Dataset | null;
   onSelectItem: (nodeId: string) => void;
-  preferCraftable: boolean;
-  onTogglePreferCraftable: () => void;
   showModOnly: boolean;
   onToggleShowModOnly: () => void;
 }
@@ -29,8 +27,6 @@ export default function Header({
   setActiveModId,
   activeDataset,
   onSelectItem,
-  preferCraftable,
-  onTogglePreferCraftable,
   showModOnly,
   onToggleShowModOnly,
 }: HeaderProps) {
@@ -48,21 +44,7 @@ export default function Header({
       }`}
       title={`Show only items added by ${activeMod?.label ?? activeModId}`}
     >
-      {activeMod?.label ?? activeModId} only
-    </button>
-  );
-
-  const craftableBtn = (
-    <button
-      onClick={onTogglePreferCraftable}
-      className={`text-xs px-2.5 py-1 rounded border transition-colors shrink-0 ${
-        preferCraftable
-          ? 'bg-blue-900 border-blue-600 text-blue-200'
-          : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
-      }`}
-      title="Sort category browser: craftable first, then forageable, then loot-only"
-    >
-      Craftable first
+      {activeMod?.label ?? activeModId} Only
     </button>
   );
 
@@ -127,7 +109,6 @@ export default function Header({
         {/* Filters — desktop only */}
         <div className="hidden md:flex items-center gap-2">
           {modOnlyBtn}
-          {craftableBtn}
         </div>
 
         {/* Search — desktop only; mobile gets its own row */}
@@ -147,10 +128,9 @@ export default function Header({
       {/* Secondary strip — mobile only: nav + filters + mod selector, wraps if needed */}
       <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 flex-wrap">
         {navBtns}
-        <div className="w-px h-4 bg-slate-700 shrink-0" />
+        {modOnlyBtn && <div className="w-px h-4 bg-slate-700 shrink-0" />}
         {modOnlyBtn}
         <div className="flex-1" />
-        {craftableBtn}
         {mods.length > 1 && (
           <select
             value={activeModId}
