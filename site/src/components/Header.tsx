@@ -130,8 +130,8 @@ export default function Header({
           {craftableBtn}
         </div>
 
-        {/* Search — full width on mobile */}
-        <div className="flex-1 md:flex-none">
+        {/* Search — desktop only; mobile gets its own row */}
+        <div className="hidden md:block">
           <SearchBar activeDataset={activeDataset} onSelectItem={onSelectItem} setView={setView} />
         </div>
 
@@ -139,15 +139,20 @@ export default function Header({
         <div className="hidden md:flex">{modSelector}</div>
       </div>
 
-      {/* Secondary strip — mobile only */}
-      <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 overflow-x-auto">
+      {/* Mobile search row */}
+      <div className="flex md:hidden px-3 pt-2 pb-2 border-t border-slate-700">
+        <SearchBar activeDataset={activeDataset} onSelectItem={onSelectItem} setView={setView} />
+      </div>
+
+      {/* Secondary strip — mobile only: nav + filters + mod selector, wraps if needed */}
+      <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 flex-wrap">
         {navBtns}
         <div className="w-px h-4 bg-slate-700 shrink-0" />
-        {modOnlyBtn}
         {craftableBtn}
+        {modOnlyBtn}
         {mods.length > 1 && (
           <>
-            <div className="w-px h-4 bg-slate-700 shrink-0" />
+            <div className="flex-1" />
             <select
               value={activeModId}
               onChange={(e) => setActiveModId(e.target.value)}
