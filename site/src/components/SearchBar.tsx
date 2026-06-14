@@ -48,7 +48,7 @@ export default function SearchBar({ activeDataset, onSelectItem, setView }: Sear
   }
 
   return (
-    <div ref={containerRef} className="relative w-64">
+    <div ref={containerRef} className="relative w-full md:w-64">
       <input
         ref={inputRef}
         type="text"

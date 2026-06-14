@@ -439,7 +439,7 @@ export default function GraphView({
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800 text-xs text-slate-300 shrink-0 overflow-x-auto">
         <button
           onClick={() => setHistIdx((i) => i - 1)}
           disabled={!canBack}
@@ -501,6 +501,7 @@ export default function GraphView({
           onNodeClick={handleNodeClick}
           fitView
           fitViewOptions={{ padding: 0.12 }}
+          minZoom={0.1}
           colorMode="dark"
           proOptions={{ hideAttribution: true }}
           nodesDraggable={false}
