@@ -148,23 +148,21 @@ export default function Header({
       <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 flex-wrap">
         {navBtns}
         <div className="w-px h-4 bg-slate-700 shrink-0" />
-        {craftableBtn}
         {modOnlyBtn}
+        <div className="flex-1" />
+        {craftableBtn}
         {mods.length > 1 && (
-          <>
-            <div className="flex-1" />
-            <select
-              value={activeModId}
-              onChange={(e) => setActiveModId(e.target.value)}
-              className={`text-xs bg-slate-700 rounded px-2 py-1 shrink-0 border ${modPalette.activeBorder} ${modPalette.activeText}`}
-            >
-              {mods.map((mod) => (
-                <option key={mod.id} value={mod.id} className="bg-slate-800 text-slate-200">
-                  {mod.label}
-                </option>
-              ))}
-            </select>
-          </>
+          <select
+            value={activeModId}
+            onChange={(e) => setActiveModId(e.target.value)}
+            className={`text-xs bg-slate-700 rounded px-2 py-1 shrink-0 border ${modPalette.activeBorder} ${modPalette.activeText}`}
+          >
+            {mods.map((mod) => (
+              <option key={mod.id} value={mod.id} className="bg-slate-800 text-slate-200">
+                {mod.label}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </header>
