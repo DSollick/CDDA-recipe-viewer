@@ -6,7 +6,6 @@ import CategorySidebar from './components/CategorySidebar';
 import CategoryGrid from './components/CategoryGrid';
 import DependencyTree from './components/DependencyTree';
 import NodeDetail from './components/NodeDetail';
-import BottleneckView from './components/BottleneckView';
 import GraphView from './components/GraphView';
 
 export default function App() {
@@ -135,7 +134,7 @@ export default function App() {
     );
   }
 
-  const showSidebar = view !== 'bottlenecks' && view !== 'graph';
+  const showSidebar = view !== 'graph';
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
@@ -186,13 +185,6 @@ export default function App() {
         )}
 
         <main className="flex-1 overflow-hidden flex flex-col min-w-0">
-          {view === 'bottlenecks' && (
-            <BottleneckView
-              activeDataset={activeDataset}
-              onSelectItem={handleSelectItem}
-            />
-          )}
-
           {view === 'graph' && selectedItemId && activeDataset && graphIndex && (
             <GraphView
               rootNodeId={selectedItemId}
