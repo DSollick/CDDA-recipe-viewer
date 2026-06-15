@@ -23,6 +23,8 @@ interface CategorySidebarProps {
   selectedCategory: string | null;
   onSelectCategory: (cat: string) => void;
   showModOnly: boolean;
+  preferCraftable: boolean;
+  onTogglePreferCraftable: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -32,6 +34,8 @@ export default function CategorySidebar({
   selectedCategory,
   onSelectCategory,
   showModOnly,
+  preferCraftable,
+  onTogglePreferCraftable,
   isOpen,
   onClose,
 }: CategorySidebarProps) {
@@ -75,6 +79,19 @@ export default function CategorySidebar({
           aria-label="Close menu"
         >
           ✕
+        </button>
+      </div>
+      <div className="px-3 py-2 border-b border-slate-700">
+        <button
+          onClick={onTogglePreferCraftable}
+          className={`w-full text-xs px-2.5 py-1.5 rounded border transition-colors text-left ${
+            preferCraftable
+              ? 'bg-blue-900 border-blue-600 text-blue-200'
+              : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
+          }`}
+          title="Sort category browser: craftable first, then forageable, then loot-only"
+        >
+          Craftable First
         </button>
       </div>
       <nav className="flex-1 py-1">

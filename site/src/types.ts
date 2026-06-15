@@ -62,7 +62,7 @@ export interface GraphManifest {
   mods: ModEntry[];
 }
 
-export type ViewMode = 'browse' | 'tree' | 'graph' | 'bottlenecks';
+export type ViewMode = 'browse' | 'tree' | 'graph';
 
 // Adjacency index built from edges
 export interface GraphIndex {

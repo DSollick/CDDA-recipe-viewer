@@ -13,8 +13,6 @@ interface HeaderProps {
   setActiveModId: (id: string) => void;
   activeDataset: Dataset | null;
   onSelectItem: (nodeId: string) => void;
-  preferCraftable: boolean;
-  onTogglePreferCraftable: () => void;
   showModOnly: boolean;
   onToggleShowModOnly: () => void;
 }
@@ -29,8 +27,6 @@ export default function Header({
   setActiveModId,
   activeDataset,
   onSelectItem,
-  preferCraftable,
-  onTogglePreferCraftable,
   showModOnly,
   onToggleShowModOnly,
 }: HeaderProps) {
@@ -48,21 +44,7 @@ export default function Header({
       }`}
       title={`Show only items added by ${activeMod?.label ?? activeModId}`}
     >
-      {activeMod?.label ?? activeModId} only
-    </button>
-  );
-
-  const craftableBtn = (
-    <button
-      onClick={onTogglePreferCraftable}
-      className={`text-xs px-2.5 py-1 rounded border transition-colors shrink-0 ${
-        preferCraftable
-          ? 'bg-blue-900 border-blue-600 text-blue-200'
-          : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
-      }`}
-      title="Sort category browser: craftable first, then forageable, then loot-only"
-    >
-      Craftable first
+      {activeMod?.label ?? activeModId} Only
     </button>
   );
 
@@ -91,9 +73,6 @@ export default function Header({
       </NavBtn>
       <NavBtn active={view === 'graph'} onClick={() => setView('graph')}>
         Graph
-      </NavBtn>
-      <NavBtn active={view === 'bottlenecks'} onClick={() => setView('bottlenecks')}>
-        Key Unlocks
       </NavBtn>
     </nav>
   );
@@ -130,11 +109,10 @@ export default function Header({
         {/* Filters — desktop only */}
         <div className="hidden md:flex items-center gap-2">
           {modOnlyBtn}
-          {craftableBtn}
         </div>
 
-        {/* Search — full width on mobile */}
-        <div className="flex-1 md:flex-none">
+        {/* Search — desktop only; mobile gets its own row */}
+        <div className="hidden md:block">
           <SearchBar activeDataset={activeDataset} onSelectItem={onSelectItem} setView={setView} />
         </div>
 
@@ -142,27 +120,29 @@ export default function Header({
         <div className="hidden md:flex">{modSelector}</div>
       </div>
 
-      {/* Secondary strip — mobile only */}
-      <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 overflow-x-auto">
+      {/* Mobile search row */}
+      <div className="flex md:hidden px-3 pt-2 pb-2 border-t border-slate-700">
+        <SearchBar activeDataset={activeDataset} onSelectItem={onSelectItem} setView={setView} />
+      </div>
+
+      {/* Secondary strip — mobile only: nav + filters + mod selector, wraps if needed */}
+      <div className="flex md:hidden items-center gap-2 px-3 py-2 border-t border-slate-700 flex-wrap">
         {navBtns}
-        <div className="w-px h-4 bg-slate-700 shrink-0" />
+        {modOnlyBtn && <div className="w-px h-4 bg-slate-700 shrink-0" />}
         {modOnlyBtn}
-        {craftableBtn}
+        <div className="flex-1" />
         {mods.length > 1 && (
-          <>
-            <div className="w-px h-4 bg-slate-700 shrink-0" />
-            <select
-              value={activeModId}
-              onChange={(e) => setActiveModId(e.target.value)}
-              className={`text-xs bg-slate-700 rounded px-2 py-1 shrink-0 border ${modPalette.activeBorder} ${modPalette.activeText}`}
-            >
-              {mods.map((mod) => (
-                <option key={mod.id} value={mod.id} className="bg-slate-800 text-slate-200">
-                  {mod.label}
-                </option>
-              ))}
-            </select>
-          </>
+          <select
+            value={activeModId}
+            onChange={(e) => setActiveModId(e.target.value)}
+            className={`text-xs bg-slate-700 rounded px-2 py-1 shrink-0 border ${modPalette.activeBorder} ${modPalette.activeText}`}
+          >
+            {mods.map((mod) => (
+              <option key={mod.id} value={mod.id} className="bg-slate-800 text-slate-200">
+                {mod.label}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </header>

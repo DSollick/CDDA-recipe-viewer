@@ -65,7 +65,7 @@ export default function CategoryGrid({ category, activeDataset, preferCraftable,
       {items.length === 0 ? (
         <div className="text-slate-500 text-sm">No items in this category.</div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
           {items.map((node) => (
             <ItemCard key={node.id} node={node} onSelect={onSelectItem} />
           ))}

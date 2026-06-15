@@ -6,7 +6,6 @@ import CategorySidebar from './components/CategorySidebar';
 import CategoryGrid from './components/CategoryGrid';
 import DependencyTree from './components/DependencyTree';
 import NodeDetail from './components/NodeDetail';
-import BottleneckView from './components/BottleneckView';
 import GraphView from './components/GraphView';
 
 export default function App() {
@@ -15,7 +14,7 @@ export default function App() {
 
   const [view, setView] = useState<ViewMode>('browse');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [preferCraftable, setPreferCraftable] = useState(false);
+  const [preferCraftable, setPreferCraftable] = useState(true);
   const [showModOnly, setShowModOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -91,7 +90,7 @@ export default function App() {
       setSelectedCategory(null);
     } else {
       handleSetActiveMod('vanilla');
-      setPreferCraftable(false);
+      setPreferCraftable(true);
     }
   }
 
@@ -135,7 +134,7 @@ export default function App() {
     );
   }
 
-  const showSidebar = view !== 'bottlenecks' && view !== 'graph';
+  const showSidebar = view !== 'graph';
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
@@ -149,8 +148,6 @@ export default function App() {
         setActiveModId={handleSetActiveMod}
         activeDataset={activeDataset}
         onSelectItem={handleSelectItem}
-        preferCraftable={preferCraftable}
-        onTogglePreferCraftable={() => setPreferCraftable((v) => !v)}
         showModOnly={showModOnly}
         onToggleShowModOnly={() => setShowModOnly((v) => !v)}
       />
@@ -180,19 +177,14 @@ export default function App() {
             selectedCategory={selectedCategory}
             onSelectCategory={handleSelectCategory}
             showModOnly={showModOnly}
+            preferCraftable={preferCraftable}
+            onTogglePreferCraftable={() => setPreferCraftable((v) => !v)}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />
         )}
 
         <main className="flex-1 overflow-hidden flex flex-col min-w-0">
-          {view === 'bottlenecks' && (
-            <BottleneckView
-              activeDataset={activeDataset}
-              onSelectItem={handleSelectItem}
-            />
-          )}
-
           {view === 'graph' && selectedItemId && activeDataset && graphIndex && (
             <GraphView
               rootNodeId={selectedItemId}
@@ -253,7 +245,7 @@ export default function App() {
                         onClick={() => setTreeExpandLevel(-1)}
                         className="px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors"
                         title="Collapse all auto-expanded nodes"
-                      >Collapse all</button>
+                      >Collapse All</button>
                     )}
                   </div>
                 </div>
