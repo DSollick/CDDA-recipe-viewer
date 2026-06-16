@@ -23,15 +23,17 @@ function cacheBust(file: string): string {
   return sha ? `${file}?v=${sha.slice(0, 7)}` : file;
 }
 
-export function useGraph(): UseGraphResult {
+export function useGraph(initialModId = 'vanilla'): UseGraphResult {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [manifest, setManifest] = useState<GraphManifest | null>(null);
-  const [activeModId, setActiveModId] = useState<string>('vanilla');
+  const [activeModId, setActiveModId] = useState<string>(initialModId);
   const [activeDataset, setActiveDataset] = useState<Dataset | null>(null);
 
   // Cache of already-fetched datasets keyed by mod id
   const cache = useRef<Map<string, Dataset>>(new Map());
+  // Stable ref so the manifest effect can read the initial mod without a stale closure
+  const initialModRef = useRef(initialModId);
 
   // Load manifest on mount
   useEffect(() => {
@@ -48,8 +50,11 @@ export function useGraph(): UseGraphResult {
       .then((m) => {
         if (cancelled) return;
         setManifest(m);
-        const defaultMod = m.mods.find((e) => e.default) ?? m.mods[0];
-        if (defaultMod) setActiveModId(defaultMod.id);
+        // If the URL-requested mod doesn't exist in the manifest, fall back to the default
+        if (!m.mods.some((e) => e.id === initialModRef.current)) {
+          const defaultMod = m.mods.find((e) => e.default) ?? m.mods[0];
+          if (defaultMod) setActiveModId(defaultMod.id);
+        }
         // Don't set loadState here — the dataset fetch below will do it
       })
       .catch((err: unknown) => {

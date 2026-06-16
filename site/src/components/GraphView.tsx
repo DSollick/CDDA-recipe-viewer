@@ -327,6 +327,8 @@ interface GraphViewProps {
   graphIndex: GraphIndex;
   preferCraftable?: boolean;
   onRootChange: (id: string) => void;
+  maxHops: number;
+  onMaxHopsChange: (n: number) => void;
 }
 
 export default function GraphView({
@@ -335,8 +337,9 @@ export default function GraphView({
   graphIndex,
   preferCraftable = false,
   onRootChange,
+  maxHops,
+  onMaxHopsChange,
 }: GraphViewProps) {
-  const [maxHops, setMaxHops] = useState(3);
   const [showMeta, setShowMeta] = useState(true);
   const [selectedMetaId, setSelectedMetaId] = useState<string | null>(null);
   const [slotSelections, setSlotSelections] = useState<Map<string, string>>(new Map());
@@ -465,7 +468,7 @@ export default function GraphView({
         <span className="text-slate-500">Depth</span>
         <input
           type="range" min={1} max={6} value={maxHops}
-          onChange={(e) => setMaxHops(Number(e.target.value))}
+          onChange={(e) => onMaxHopsChange(Number(e.target.value))}
           className="w-24 accent-blue-400"
         />
         <span className="w-3 text-slate-400">{maxHops}</span>
