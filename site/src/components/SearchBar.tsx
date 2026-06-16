@@ -17,7 +17,7 @@ export default function SearchBar({ activeDataset, onSelectItem, setView }: Sear
     if (!activeDataset || query.trim().length === 0) return [];
     const q = query.toLowerCase();
     const matched = Object.values(activeDataset.nodes)
-      .filter((n) => n.display_name.toLowerCase().includes(q))
+      .filter((n) => n.type === 'item' && n.display_name.toLowerCase().includes(q))
       .slice(0, 20);
     matched.sort((a, b) => a.display_name.localeCompare(b.display_name));
     return matched;

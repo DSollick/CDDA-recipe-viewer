@@ -146,7 +146,7 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
             <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
               {usedByNodes.map((n) => (
                 <li key={n.id} className="flex items-baseline gap-2">
-                  {onSelectItem ? (
+                  {onSelectItem && n.type === 'item' ? (
                     <button
                       onClick={() => onSelectItem(n.id)}
                       className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
@@ -154,7 +154,10 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
                       {n.display_name}
                     </button>
                   ) : (
-                    <span className="text-slate-300 text-sm">{n.display_name}</span>
+                    <span className="text-slate-400 text-sm">{n.display_name}</span>
+                  )}
+                  {n.type !== 'item' && (
+                    <span className="text-xs text-slate-600">{n.type}</span>
                   )}
                   {gatedIds.has(n.id) && (
                     <span className="text-xs bg-amber-900 text-amber-300 rounded px-1 py-0.5 shrink-0">required</span>
