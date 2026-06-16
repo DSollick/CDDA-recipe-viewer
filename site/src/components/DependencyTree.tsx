@@ -257,7 +257,7 @@ function TreeNodeRow({
         )}
 
         {/* Quality level badge */}
-        {edge?.type === 'requires_tool_quality' && edge.quality_level !== null && (
+        {(edge?.type === 'requires_tool_quality' || edge?.type === 'requires_skill') && edge.quality_level !== null && (
           <span className="text-xs text-slate-400 shrink-0">lvl {edge.quality_level}</span>
         )}
 
