@@ -35,7 +35,8 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
 
 export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom, graphIndex }: NodeDetailProps) {
   const [showUsedBy, setShowUsedBy] = useState(false);
-  useEffect(() => { setShowUsedBy(false); }, [node.id]);
+  const [showDisassembledFrom, setShowDisassembledFrom] = useState(false);
+  useEffect(() => { setShowUsedBy(false); setShowDisassembledFrom(false); }, [node.id]);
 
   // Disassembly yields — look up uncraft_{node.id} and read its byproduct_of edges
   const uncraftId = `uncraft_${node.id}`;
@@ -48,21 +49,35 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         .sort((a, b) => a.itemNode.display_name.localeCompare(b.itemNode.display_name))
     : null;
 
-  const usedByNodes = Array.from(
-    new Set((graphIndex?.inEdges.get(node.id) ?? []).map((e) => e.from))
+  const allInEdges = graphIndex?.inEdges.get(node.id) ?? [];
+
+  // Items whose crafting recipe uses this node as a component
+  const craftingUsers = Array.from(
+    new Set(allInEdges.filter((e) => e.type === 'requires_component').map((e) => e.from))
   )
     .map((id) => nodes?.[id])
-    .filter((n): n is GraphNode => !!n)
+    .filter((n): n is GraphNode => !!n && n.type === 'item')
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
-  // A dependent recipe is "gated" if every edge from it to this node occupies a slot
-  // with no alternative component options (slot_index appears only once in outEdges).
+  // Items that yield this node when disassembled (byproduct_of edges come from uncraft_X nodes)
+  const disassembledFrom = Array.from(
+    new Set(allInEdges.filter((e) => e.type === 'byproduct_of').map((e) => e.from))
+  )
+    .map((uncraftId) => {
+      const itemId = uncraftId.replace(/^uncraft_/, '');
+      const itemNode = nodes?.[itemId];
+      return itemNode ? { id: itemId, node: itemNode } : null;
+    })
+    .filter((s): s is { id: string; node: GraphNode } => !!s)
+    .sort((a, b) => a.node.display_name.localeCompare(b.node.display_name));
+
+  // A crafting user is "gated" if this node has no alternatives in any of its component slots
   const gatedIds = graphIndex
     ? new Set(
-        usedByNodes
+        craftingUsers
           .map((n) => n.id)
           .filter((depId) => {
-            const edges = (graphIndex.inEdges.get(node.id) ?? []).filter(
+            const edges = allInEdges.filter(
               (e) => e.from === depId && e.type === 'requires_component' && e.slot_index !== null
             );
             return edges.some((edge) => {
@@ -168,21 +183,21 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         </DetailRow>
       )}
 
-      {/* Used-by list */}
-      {usedByNodes.length > 0 && (
+      {/* Used in crafting */}
+      {craftingUsers.length > 0 && (
         <DetailRow label="Used In">
           <button
             onClick={() => setShowUsedBy((v) => !v)}
             className="text-amber-300 font-semibold hover:text-amber-100 transition-colors"
           >
-            {usedByNodes.length} item{usedByNodes.length !== 1 ? 's' : ''} use this{' '}
+            {craftingUsers.length} item{craftingUsers.length !== 1 ? 's' : ''}{' '}
             <span className="text-xs">{showUsedBy ? '▲' : '▼'}</span>
           </button>
           {showUsedBy && (
             <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
-              {usedByNodes.map((n) => (
+              {craftingUsers.map((n) => (
                 <li key={n.id} className="flex items-baseline gap-2">
-                  {onSelectItem && n.type === 'item' ? (
+                  {onSelectItem ? (
                     <button
                       onClick={() => onSelectItem(n.id)}
                       className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
@@ -190,13 +205,41 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
                       {n.display_name}
                     </button>
                   ) : (
-                    <span className="text-slate-400 text-sm">{n.display_name}</span>
-                  )}
-                  {n.type !== 'item' && (
-                    <span className="text-xs text-slate-600">{n.type}</span>
+                    <span className="text-slate-300 text-sm">{n.display_name}</span>
                   )}
                   {gatedIds.has(n.id) && (
                     <span className="text-xs bg-amber-900 text-amber-300 rounded px-1 py-0.5 shrink-0">required</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DetailRow>
+      )}
+
+      {/* Disassembled from */}
+      {disassembledFrom.length > 0 && (
+        <DetailRow label="Disassembled From">
+          <button
+            onClick={() => setShowDisassembledFrom((v) => !v)}
+            className="text-teal-400 font-semibold hover:text-teal-200 transition-colors"
+          >
+            {disassembledFrom.length} item{disassembledFrom.length !== 1 ? 's' : ''}{' '}
+            <span className="text-xs">{showDisassembledFrom ? '▲' : '▼'}</span>
+          </button>
+          {showDisassembledFrom && (
+            <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
+              {disassembledFrom.map(({ id, node: n }) => (
+                <li key={id}>
+                  {onSelectItem ? (
+                    <button
+                      onClick={() => onSelectItem(id)}
+                      className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                    >
+                      {n.display_name}
+                    </button>
+                  ) : (
+                    <span className="text-slate-300 text-sm">{n.display_name}</span>
                   )}
                 </li>
               ))}
