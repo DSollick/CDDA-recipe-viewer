@@ -17,6 +17,7 @@ const _initCat     = _p.get('cat');
 const _initDetail  = _p.get('detail');
 const _initCraft   = _p.get('craft') !== '0';   // default true
 const _initModOnly = _p.get('modonly') === '1';
+const _initDepth   = Math.min(6, Math.max(1, parseInt(_p.get('depth') ?? '3', 10)));
 
 export default function App() {
   const { loadState, errorMessage, manifest, activeDataset, activeModId, setActiveModId, graphIndex } =
@@ -27,6 +28,7 @@ export default function App() {
   const [preferCraftable, setPreferCraftable] = useState(_initCraft);
   const [showModOnly, setShowModOnly] = useState(_initModOnly);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(_initItem);
+  const [graphDepth, setGraphDepth] = useState(_initDepth);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(_initDetail ?? _initItem);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,9 +47,10 @@ export default function App() {
     if (detailNodeId && detailNodeId !== selectedItemId)       p.set('detail', detailNodeId);
     if (!preferCraftable)                                      p.set('craft', '0');
     if (showModOnly)                                           p.set('modonly', '1');
+    if (graphDepth !== 3)                                      p.set('depth', String(graphDepth));
     const qs = p.toString();
     window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
-  }, [view, activeModId, selectedCategory, selectedItemId, detailNodeId, preferCraftable, showModOnly]);
+  }, [view, activeModId, selectedCategory, selectedItemId, detailNodeId, preferCraftable, showModOnly, graphDepth]);
 
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
 
@@ -216,6 +219,8 @@ export default function App() {
               graphIndex={graphIndex}
               preferCraftable={preferCraftable}
               onRootChange={(id) => setSelectedItemId(id)}
+              maxHops={graphDepth}
+              onMaxHopsChange={setGraphDepth}
             />
           )}
 
