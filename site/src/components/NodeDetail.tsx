@@ -37,6 +37,17 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
   const [showUsedBy, setShowUsedBy] = useState(false);
   useEffect(() => { setShowUsedBy(false); }, [node.id]);
 
+  // Disassembly yields — look up uncraft_{node.id} and read its byproduct_of edges
+  const uncraftId = `uncraft_${node.id}`;
+  const uncraftNode = nodes?.[uncraftId];
+  const disassemblyYields = uncraftNode && graphIndex
+    ? (graphIndex.outEdges.get(uncraftId) ?? [])
+        .filter((e) => e.type === 'byproduct_of')
+        .map((e) => ({ itemNode: nodes?.[e.to], quantity: e.quantity, id: e.to }))
+        .filter((e): e is { itemNode: GraphNode; quantity: number; id: string } => !!e.itemNode)
+        .sort((a, b) => a.itemNode.display_name.localeCompare(b.itemNode.display_name))
+    : null;
+
   const usedByNodes = Array.from(
     new Set((graphIndex?.inEdges.get(node.id) ?? []).map((e) => e.from))
   )
@@ -100,6 +111,31 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
       {node.craft_time && (
         <DetailRow label="Craft time">
           <span className="text-slate-200">{node.craft_time}</span>
+        </DetailRow>
+      )}
+
+      {/* Disassembly yields */}
+      {disassemblyYields && disassemblyYields.length > 0 && (
+        <DetailRow label={`Disassembly${uncraftNode?.craft_time ? ` (${uncraftNode.craft_time})` : ''}`}>
+          <ul className="space-y-0.5">
+            {disassemblyYields.map(({ itemNode, quantity, id }) => (
+              <li key={id} className="flex items-baseline gap-2 text-sm">
+                {onSelectItem ? (
+                  <button
+                    onClick={() => onSelectItem(id)}
+                    className="text-left text-blue-300 hover:text-blue-100 hover:underline"
+                  >
+                    {itemNode.display_name}
+                  </button>
+                ) : (
+                  <span className="text-slate-300">{itemNode.display_name}</span>
+                )}
+                {quantity > 1 && (
+                  <span className="text-slate-500">×{quantity}</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </DetailRow>
       )}
 
