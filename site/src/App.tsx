@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ViewMode } from './types';
 import { useGraph } from './hooks/useGraph';
 import Header from './components/Header';
@@ -8,22 +8,46 @@ import DependencyTree from './components/DependencyTree';
 import NodeDetail from './components/NodeDetail';
 import GraphView from './components/GraphView';
 
+// Parse URL once at module load — synchronous, no re-render cost
+const _p = new URLSearchParams(window.location.search);
+const _initMod     = _p.get('mod') ?? 'vanilla';
+const _initView    = (_p.get('view') as ViewMode) ?? 'browse';
+const _initItem    = _p.get('item');
+const _initCat     = _p.get('cat');
+const _initDetail  = _p.get('detail');
+const _initCraft   = _p.get('craft') !== '0';   // default true
+const _initModOnly = _p.get('modonly') === '1';
+
 export default function App() {
   const { loadState, errorMessage, manifest, activeDataset, activeModId, setActiveModId, graphIndex } =
-    useGraph();
+    useGraph(_initMod);
 
-  const [view, setView] = useState<ViewMode>('browse');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [preferCraftable, setPreferCraftable] = useState(true);
-  const [showModOnly, setShowModOnly] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>(_initView);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(_initCat);
+  const [preferCraftable, setPreferCraftable] = useState(_initCraft);
+  const [showModOnly, setShowModOnly] = useState(_initModOnly);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(_initItem);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(_initDetail ?? _initItem);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [treeHistory, setTreeHistory] = useState<string[]>([]);
-  const [treeHistIdx, setTreeHistIdx] = useState(-1);
+  const [treeHistory, setTreeHistory] = useState<string[]>(_initItem ? [_initItem] : []);
+  const [treeHistIdx, setTreeHistIdx] = useState(_initItem ? 0 : -1);
   const [treeExpandLevel, setTreeExpandLevel] = useState(-1);
+
+  // Sync shareable state → URL (replaceState keeps a single history entry)
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (activeModId !== 'vanilla')                             p.set('mod', activeModId);
+    if (view !== 'browse')                                     p.set('view', view);
+    if (selectedCategory)                                      p.set('cat', selectedCategory);
+    if (selectedItemId)                                        p.set('item', selectedItemId);
+    if (detailNodeId && detailNodeId !== selectedItemId)       p.set('detail', detailNodeId);
+    if (!preferCraftable)                                      p.set('craft', '0');
+    if (showModOnly)                                           p.set('modonly', '1');
+    const qs = p.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+  }, [view, activeModId, selectedCategory, selectedItemId, detailNodeId, preferCraftable, showModOnly]);
 
   const panelNodeId = hoveredNodeId ?? detailNodeId ?? selectedItemId;
 
