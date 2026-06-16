@@ -224,7 +224,7 @@ function TreeNodeRow({
           isSelected ? 'bg-slate-700' : 'hover:bg-slate-800'
         }`}
         onClick={() => onClickNode(treeNode.nodeId)}
-        onDoubleClick={() => onDoubleClickNode?.(treeNode.nodeId)}
+        onDoubleClick={() => node?.type === 'item' && onDoubleClickNode?.(treeNode.nodeId)}
         onMouseEnter={() => onHoverNode(treeNode.nodeId)}
         onMouseLeave={() => onHoverNode(null)}
       >

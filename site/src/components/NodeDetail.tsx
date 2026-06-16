@@ -1,5 +1,5 @@
-import React from 'react';
-import { GraphNode } from '../types';
+import React, { useState, useEffect } from 'react';
+import { GraphNode, GraphIndex } from '../types';
 import { getModPalette } from '../modColors';
 
 interface NodeDetailProps {
@@ -9,6 +9,7 @@ interface NodeDetailProps {
   onSelectItem?: (id: string) => void;
   harvestedFrom?: string[];
   foragedFrom?: string[];
+  graphIndex?: GraphIndex;
 }
 
 const TYPE_COLORS: Record<GraphNode['type'], string> = {
@@ -32,7 +33,63 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
   return <span className={`inline-block text-xs rounded px-2 py-0.5 ${className}`}>{children}</span>;
 }
 
-export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom }: NodeDetailProps) {
+export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom, graphIndex }: NodeDetailProps) {
+  const [showUsedBy, setShowUsedBy] = useState(false);
+  const [showDisassembledFrom, setShowDisassembledFrom] = useState(false);
+  useEffect(() => { setShowUsedBy(false); setShowDisassembledFrom(false); }, [node.id]);
+
+  // Disassembly yields — look up uncraft_{node.id} and read its byproduct_of edges
+  const uncraftId = `uncraft_${node.id}`;
+  const uncraftNode = nodes?.[uncraftId];
+  const disassemblyYields = uncraftNode && graphIndex
+    ? (graphIndex.outEdges.get(uncraftId) ?? [])
+        .filter((e) => e.type === 'byproduct_of')
+        .map((e) => ({ itemNode: nodes?.[e.to], quantity: e.quantity, id: e.to }))
+        .filter((e): e is { itemNode: GraphNode; quantity: number; id: string } => !!e.itemNode)
+        .sort((a, b) => a.itemNode.display_name.localeCompare(b.itemNode.display_name))
+    : null;
+
+  const allInEdges = graphIndex?.inEdges.get(node.id) ?? [];
+
+  // Items whose crafting recipe uses this node as a component
+  const craftingUsers = Array.from(
+    new Set(allInEdges.filter((e) => e.type === 'requires_component').map((e) => e.from))
+  )
+    .map((id) => nodes?.[id])
+    .filter((n): n is GraphNode => !!n && n.type === 'item')
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+
+  // Items that yield this node when disassembled (byproduct_of edges come from uncraft_X nodes)
+  const disassembledFrom = Array.from(
+    new Set(allInEdges.filter((e) => e.type === 'byproduct_of').map((e) => e.from))
+  )
+    .map((uncraftId) => {
+      const itemId = uncraftId.replace(/^uncraft_/, '');
+      const itemNode = nodes?.[itemId];
+      return itemNode ? { id: itemId, node: itemNode } : null;
+    })
+    .filter((s): s is { id: string; node: GraphNode } => !!s)
+    .sort((a, b) => a.node.display_name.localeCompare(b.node.display_name));
+
+  // A crafting user is "gated" if this node has no alternatives in any of its component slots
+  const gatedIds = graphIndex
+    ? new Set(
+        craftingUsers
+          .map((n) => n.id)
+          .filter((depId) => {
+            const edges = allInEdges.filter(
+              (e) => e.from === depId && e.type === 'requires_component' && e.slot_index !== null
+            );
+            return edges.some((edge) => {
+              const sameSlot = (graphIndex.outEdges.get(depId) ?? []).filter(
+                (e) => e.slot_index === edge.slot_index && e.type === 'requires_component'
+              );
+              return sameSlot.length === 1;
+            });
+          })
+      )
+    : new Set<string>();
+
   const typeColor = TYPE_COLORS[node.type] ?? 'bg-slate-700 text-slate-300';
   const learnColor = node.learn_method
     ? (LEARN_METHOD_COLORS[node.learn_method] ?? 'bg-slate-700 text-slate-300')
@@ -72,6 +129,31 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         </DetailRow>
       )}
 
+      {/* Disassembly yields */}
+      {disassemblyYields && disassemblyYields.length > 0 && (
+        <DetailRow label={`Disassembly${uncraftNode?.craft_time ? ` (${uncraftNode.craft_time})` : ''}`}>
+          <ul className="space-y-0.5">
+            {disassemblyYields.map(({ itemNode, quantity, id }) => (
+              <li key={id} className="flex items-baseline gap-2 text-sm">
+                {onSelectItem ? (
+                  <button
+                    onClick={() => onSelectItem(id)}
+                    className="text-left text-blue-300 hover:text-blue-100 hover:underline"
+                  >
+                    {itemNode.display_name}
+                  </button>
+                ) : (
+                  <span className="text-slate-300">{itemNode.display_name}</span>
+                )}
+                {quantity > 1 && (
+                  <span className="text-slate-500">×{quantity}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </DetailRow>
+      )}
+
       {/* Skill requirements */}
       {node.skill_requirements.length > 0 && (
         <DetailRow label="Skills required">
@@ -101,12 +183,68 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
         </DetailRow>
       )}
 
-      {/* Bottleneck score */}
-      {node.bottleneck_score > 0 && (
-        <DetailRow label="Impact">
-          <span className="text-amber-300 font-semibold">
-            Gates {node.bottleneck_score} recipe{node.bottleneck_score !== 1 ? 's' : ''}
-          </span>
+      {/* Used in crafting */}
+      {craftingUsers.length > 0 && (
+        <DetailRow label="Used In">
+          <button
+            onClick={() => setShowUsedBy((v) => !v)}
+            className="text-amber-300 font-semibold hover:text-amber-100 transition-colors"
+          >
+            {craftingUsers.length} item{craftingUsers.length !== 1 ? 's' : ''}{' '}
+            <span className="text-xs">{showUsedBy ? '▲' : '▼'}</span>
+          </button>
+          {showUsedBy && (
+            <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
+              {craftingUsers.map((n) => (
+                <li key={n.id} className="flex items-baseline gap-2">
+                  {onSelectItem ? (
+                    <button
+                      onClick={() => onSelectItem(n.id)}
+                      className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                    >
+                      {n.display_name}
+                    </button>
+                  ) : (
+                    <span className="text-slate-300 text-sm">{n.display_name}</span>
+                  )}
+                  {gatedIds.has(n.id) && (
+                    <span className="text-xs bg-amber-900 text-amber-300 rounded px-1 py-0.5 shrink-0">required</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DetailRow>
+      )}
+
+      {/* Disassembled from */}
+      {disassembledFrom.length > 0 && (
+        <DetailRow label="Disassembled From">
+          <button
+            onClick={() => setShowDisassembledFrom((v) => !v)}
+            className="text-teal-400 font-semibold hover:text-teal-200 transition-colors"
+          >
+            {disassembledFrom.length} item{disassembledFrom.length !== 1 ? 's' : ''}{' '}
+            <span className="text-xs">{showDisassembledFrom ? '▲' : '▼'}</span>
+          </button>
+          {showDisassembledFrom && (
+            <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
+              {disassembledFrom.map(({ id, node: n }) => (
+                <li key={id}>
+                  {onSelectItem ? (
+                    <button
+                      onClick={() => onSelectItem(id)}
+                      className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                    >
+                      {n.display_name}
+                    </button>
+                  ) : (
+                    <span className="text-slate-300 text-sm">{n.display_name}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </DetailRow>
       )}
 
