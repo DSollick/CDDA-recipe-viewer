@@ -277,6 +277,7 @@ export default function App() {
                     onSelectItem={handleSelectItem}
                     harvestedFrom={activeDataset.harvested_from?.[panelNodeId]}
                     foragedFrom={activeDataset.foraged_from?.[panelNodeId]}
+                    graphIndex={graphIndex ?? undefined}
                   />
                 ) : (
                   <div className="text-slate-500 text-sm mt-4">

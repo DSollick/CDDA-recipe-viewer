@@ -1,5 +1,5 @@
-import React from 'react';
-import { GraphNode } from '../types';
+import React, { useState, useEffect } from 'react';
+import { GraphNode, GraphIndex } from '../types';
 import { getModPalette } from '../modColors';
 
 interface NodeDetailProps {
@@ -9,6 +9,7 @@ interface NodeDetailProps {
   onSelectItem?: (id: string) => void;
   harvestedFrom?: string[];
   foragedFrom?: string[];
+  graphIndex?: GraphIndex;
 }
 
 const TYPE_COLORS: Record<GraphNode['type'], string> = {
@@ -32,7 +33,10 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
   return <span className={`inline-block text-xs rounded px-2 py-0.5 ${className}`}>{children}</span>;
 }
 
-export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom }: NodeDetailProps) {
+export default function NodeDetail({ node, providers, nodes, onSelectItem, harvestedFrom, foragedFrom, graphIndex }: NodeDetailProps) {
+  const [showUsedBy, setShowUsedBy] = useState(false);
+  useEffect(() => { setShowUsedBy(false); }, [node.id]);
+
   const typeColor = TYPE_COLORS[node.type] ?? 'bg-slate-700 text-slate-300';
   const learnColor = node.learn_method
     ? (LEARN_METHOD_COLORS[node.learn_method] ?? 'bg-slate-700 text-slate-300')
@@ -104,9 +108,35 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
       {/* Bottleneck score */}
       {node.bottleneck_score > 0 && (
         <DetailRow label="Impact">
-          <span className="text-amber-300 font-semibold">
-            Gates {node.bottleneck_score} recipe{node.bottleneck_score !== 1 ? 's' : ''}
-          </span>
+          <button
+            onClick={() => setShowUsedBy((v) => !v)}
+            className="text-amber-300 font-semibold hover:text-amber-100 transition-colors"
+          >
+            Gates {node.bottleneck_score} recipe{node.bottleneck_score !== 1 ? 's' : ''}{' '}
+            <span className="text-xs">{showUsedBy ? '▲' : '▼'}</span>
+          </button>
+          {showUsedBy && (
+            <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
+              {Array.from(new Set((graphIndex?.inEdges.get(node.id) ?? []).map((e) => e.from)))
+                .map((id) => nodes?.[id])
+                .filter((n): n is GraphNode => !!n)
+                .sort((a, b) => a.display_name.localeCompare(b.display_name))
+                .map((n) => (
+                  <li key={n.id}>
+                    {onSelectItem ? (
+                      <button
+                        onClick={() => onSelectItem(n.id)}
+                        className="text-left text-blue-300 hover:text-blue-100 hover:underline text-sm"
+                      >
+                        {n.display_name}
+                      </button>
+                    ) : (
+                      <span className="text-slate-300 text-sm">{n.display_name}</span>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
         </DetailRow>
       )}
 
