@@ -44,6 +44,26 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
     .filter((n): n is GraphNode => !!n)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
+  // A dependent recipe is "gated" if every edge from it to this node occupies a slot
+  // with no alternative component options (slot_index appears only once in outEdges).
+  const gatedIds = graphIndex
+    ? new Set(
+        usedByNodes
+          .map((n) => n.id)
+          .filter((depId) => {
+            const edges = (graphIndex.inEdges.get(node.id) ?? []).filter(
+              (e) => e.from === depId && e.type === 'requires_component' && e.slot_index !== null
+            );
+            return edges.some((edge) => {
+              const sameSlot = (graphIndex.outEdges.get(depId) ?? []).filter(
+                (e) => e.slot_index === edge.slot_index && e.type === 'requires_component'
+              );
+              return sameSlot.length === 1;
+            });
+          })
+      )
+    : new Set<string>();
+
   const typeColor = TYPE_COLORS[node.type] ?? 'bg-slate-700 text-slate-300';
   const learnColor = node.learn_method
     ? (LEARN_METHOD_COLORS[node.learn_method] ?? 'bg-slate-700 text-slate-300')
@@ -125,7 +145,7 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
           {showUsedBy && (
             <ul className="mt-2 space-y-0.5 max-h-64 overflow-y-auto">
               {usedByNodes.map((n) => (
-                <li key={n.id}>
+                <li key={n.id} className="flex items-baseline gap-2">
                   {onSelectItem ? (
                     <button
                       onClick={() => onSelectItem(n.id)}
@@ -135,6 +155,9 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
                     </button>
                   ) : (
                     <span className="text-slate-300 text-sm">{n.display_name}</span>
+                  )}
+                  {gatedIds.has(n.id) && (
+                    <span className="text-xs bg-amber-900 text-amber-300 rounded px-1 py-0.5 shrink-0">required</span>
                   )}
                 </li>
               ))}
