@@ -154,7 +154,7 @@ function buildLayoutedGraph(
       const baseName = base?.display_name ?? baseId.replace(/^(?:skill|quality)_/, '');
       syntheticNodes.set(id, {
         ...(base ?? {
-          id, type: fallbackType, era: null, learn_method: null,
+          id, type: fallbackType, learn_method: null,
           book_sources: [], skill_requirements: [], proficiency_requirements: [],
           craft_time: null, bottleneck_score: 0, spawn_class: null,
           incomplete: false, pseudo: false,
@@ -168,7 +168,7 @@ function buildLayoutedGraph(
 
   function getNode(id: string): GraphNode {
     return nodes[id] ?? syntheticNodes.get(id) ?? {
-      id, type: 'item', display_name: id, era: null, learn_method: null,
+      id, type: 'item', display_name: id, learn_method: null,
       book_sources: [], skill_requirements: [], proficiency_requirements: [],
       craft_time: null, bottleneck_score: 0, spawn_class: null,
       incomplete: true, pseudo: false,

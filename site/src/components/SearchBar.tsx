@@ -67,9 +67,6 @@ export default function SearchBar({ activeDataset, onSelectItem, setView }: Sear
               className="w-full text-left px-3 py-2 hover:bg-slate-700 text-sm border-b border-slate-700 last:border-b-0"
             >
               <span className="text-slate-100">{node.display_name}</span>
-              {node.era && (
-                <span className="ml-2 text-xs text-slate-400">{node.era}</span>
-              )}
             </button>
           ))}
         </div>

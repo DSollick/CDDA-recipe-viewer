@@ -2,7 +2,6 @@ export interface GraphNode {
   id: string;
   type: 'item' | 'construction' | 'disassembly' | 'practice' | 'quality' | 'skill' | 'proficiency' | 'group';
   display_name: string;
-  era: string | null;
   learn_method: string | null; // 'autolearn' | 'book' | 'practice' | null
   book_sources: unknown[];
   skill_requirements: Array<{ skill: string; level: number }>;
@@ -38,7 +37,6 @@ export interface GraphEdge {
 export interface Dataset {
   nodes: Record<string, GraphNode>;
   edges: GraphEdge[];
-  eras: Record<string, string[]>;
   bottlenecks: string[];
   quality_providers: Record<string, string[]>;
   group_providers: Record<string, string[]>;

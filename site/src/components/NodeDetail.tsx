@@ -106,8 +106,6 @@ export default function NodeDetail({ node, providers, nodes, onSelectItem, harve
       {/* Badges */}
       <div className="flex flex-wrap gap-2">
         <Badge className={typeColor}>{node.type}</Badge>
-        {node.era && <Badge className="bg-slate-700 text-slate-300">{node.era}</Badge>}
-        {!node.era && <Badge className="bg-slate-700 text-slate-500">uncategorized</Badge>}
         {node.learn_method && learnColor && (
           <Badge className={learnColor}>{node.learn_method}</Badge>
         )}
