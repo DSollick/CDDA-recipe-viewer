@@ -186,6 +186,14 @@ export default function App() {
           {import.meta.env.VITE_DEPLOY_SHA && (
             <span className="text-slate-600">site {import.meta.env.VITE_DEPLOY_SHA.slice(0, 7)}</span>
           )}
+          <a
+            href="https://github.com/dsollick/CDDA-recipe-viewer/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            Report issue
+          </a>
         </div>
       )}
 
